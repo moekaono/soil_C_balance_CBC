@@ -1,0 +1,316 @@
+---
+title: "CBC_figure_paper"
+author: "Moeka"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("dplyr")
+library("gridExtra")
+library("ggplot2")
+library("cowplot")
+library("grid")
+library("ggpubr")
+```
+
+```{r climate figure}
+setwd("G:/Shared drives/Project_CooksBranch/Data/vwc")
+temp_IB_filled <- read.csv("temp_IB_filled.csv")
+
+temp_IB_filled$TIMESTAMP <- as.POSIXct(temp_IB_filled$TIMESTAMP)
+
+
+
+
+p_Ts_cbc <-
+  temp_IB_filled %>%
+  select(c("TIMESTAMP", "temp_avg_f", "temp_avg_fqc")) %>%
+  mutate(fqc = ifelse(temp_avg_fqc == 0, "Obs", "Model")) %>%
+  ggplot() + 
+  geom_point(aes(TIMESTAMP,temp_avg_f, col = fqc))+ 
+  scale_color_discrete(name = 'Methods', labels=c('Model', "Obs")) +
+  theme_bw() + ylab("Soil temperature (\u00B0C)") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 20),
+        axis.title.y = element_text(size = 30),axis.text.y = element_text(size = 30),
+        legend.title = element_text(size = 25),legend.text = element_text(size = 25),
+        axis.ticks.x=element_blank(),
+        legend.position = c(.9,.2))
+
+# moisture
+p_vwc_cbc <-
+  ggplot(temp_IB_filled) + 
+  geom_point(aes(TIMESTAMP,vwc_avg))+
+    theme_bw() + ylab("VWC") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 20),
+        axis.title.y = element_text(size = 30),axis.text.y = element_text(size = 30),
+        legend.title = element_text(size = 25),legend.text = element_text(size = 25),
+        legend.position = c(.9,.2))
+
+
+ggarrange(p_Ts_cbc + rremove("xlab"),
+                     p_vwc_cbc + rremove("xlab"), nrow = 2,
+          labels = c("(a)", "(b)"), hjust = -.2,
+          font.label = list(size = 20, color = "black")) 
+
+
+# moisture star
+temp_IB_filled %>% select(vwc_avg) %>% summary()
+```
+
+```{r temporal deep:shallow ratio}
+#### Temporal fraction changes - bar +- sd ####
+sr_st_fraction %>% 
+  filter(!MY %in% c("Aug20", "Sep20")) %>%
+  mutate(date = as.Date.character(paste0("01-", substring(MY,1,3), "-", substring(MY, 4,5)), 
+         format = "%d-%b-%y")) %>% 
+  ggplot(aes(x= date,y=mean,col=stands))+
+  geom_point(size = 5, position=position_dodge(15))+
+  geom_errorbar(aes(ymin= mean - sd, ymax= mean + sd),lwd=1.5, width=.2,position=position_dodge(15))+
+  geom_hline(yintercept=1, color="black", size=1.5, alpha=0.4)+ 
+  labs(color = "Stand", fill = "Stand") + scale_x_date(date_breaks = "3 months", date_labels = "%b-%y") +
+  ylab("Deep:Shallow ratio")+theme_bw() +#ggtitle("Temporal changes in fraction")+
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        legend.title = element_text(size = 20),legend.text = element_text(size = 20),
+        legend.position = c(.9,.85), plot.margin = margin(, 2, , , "cm"))
+
+```
+
+
+```{r q10 plot per CBC}
+# Run CBC-IB_SR.Rmd first
+
+# SR
+p_q10_SR_cbc <- 
+  ggplot(q10_table_CBC) + theme_bw() +
+  geom_point(aes(x=Ts,y=Flux_adj,col=stands),
+             size=2, alpha = .5) + 
+  geom_line(aes(Ts,est,col=stands),
+            size = 1.5, alpha = .8) +
+  xlab("Soil temperature (\u00B0C)") +  ylab(expression("SR ("~mu~"mol m"^2~"s"^-1~")")) +
+  theme(axis.title.x = element_text(size = 30),axis.text.x = element_text(size = 30),
+        axis.title.y = element_text(size = 30),axis.text.y = element_text(size = 30),
+        legend.title = element_text(size = 20),legend.text = element_text(size = 20))+
+  scale_colour_manual("Stand",values=c("#F8766D","#7CAE00","#00BFC4"))
+
+
+# Rh
+p_q10_Rh_cbc <- 
+  ggplot(q10_table_stb_Rh) + theme_bw() +
+  geom_point(aes(x=Ts,y=Rh,col=stands),
+             size=2, alpha = .5) + 
+  geom_line(aes(Ts,est,col=stands),
+            size = 1.5, alpha = .8) + ylim(0,13) +
+  xlab("Soil temperature (\u00b0C)") +  ylab(expression("Rh ("~mu~"mol m"^2~"s"^-1~")")) +
+  theme(axis.title.x = element_text(size = 30),axis.text.x = element_text(size = 30),
+        axis.title.y = element_text(size = 30),axis.text.y = element_text(size = 30),
+        legend.title = element_text(size = 20),legend.text = element_text(size = 20))+
+  scale_colour_manual("Stand",values=c("#F8766D","#7CAE00","#00BFC4")) 
+
+
+# Ra
+p_q10_Ra_cbc <- 
+  ggplot(q10_table_stb_Ra) + theme_bw() +
+  geom_point(aes(x=Ts,y=Ra,col=stands),
+             size=2, alpha = .5) + 
+  geom_line(aes(Ts,est,col=stands),
+            size = 1.5, alpha = .8) + ylim(0,13)+
+  xlab("Soil temperature (\u00b0C)") +  ylab(expression("Ra ("~mu~"mol m"^2~"s"^-1~")")) +
+  theme(axis.title.x = element_text(size = 30),axis.text.x = element_text(size = 30),
+        axis.title.y = element_text(size = 30),axis.text.y = element_text(size = 30),
+        legend.title = element_text(size = 20),legend.text = element_text(size = 20))+
+  scale_colour_manual("Stand",values=c("#F8766D","#7CAE00","#00BFC4")) 
+
+
+
+p_q10_cbc  <- 
+  ggarrange(p_q10_SR_cbc + rremove("xlab"),
+                        p_q10_Rh_cbc + rremove("xlab"),
+                        p_q10_Ra_cbc + rremove("xlab"),
+                        ncol = 3, common.legend = TRUE,
+                        labels = c("(a)", "(b)", "(c)"), vjust = 2, hjust = -4.5,
+                        font.label = list(size = 18))
+
+annotate_figure(p_q10_cbc, 
+                bottom = textGrob("Soil temperature (\u00B0C)", 
+                                  gp = gpar(cex = 1.3, fontsize = 20)))
+```
+
+```{r rh}
+# want to convert mmmyy date to yyyy-mm-dd
+p_cbc_Rh <- 
+  rsrh_cum_yr_CI %>% 
+  mutate(date = as.Date.character(paste0("01-", substring(MY,1,3), "-", substring(MY, 4,5)), 
+         format = "%d-%b-%y")) %>% 
+  ggplot(aes(x= date, y= Rh_avg_cum_mean, group = stands,col=stands))+
+  geom_line() + geom_point()+
+  geom_ribbon(aes(ymin = Rh_avg_cum_lower, ymax = Rh_avg_cum_upper, fill = stands), alpha=0.1, linetype="dashed")+
+  ylab(expression("Rh (g C m"^-2~")"))+theme_bw() +
+  ylim(-15,1000) + scale_x_date(date_breaks = "3 months", date_labels = "%b-%y") +
+  labs(color = "Stand", fill = "Stand") + #scale_alpha(guide = 'none') +
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        title = element_text(size = 25),legend.title = element_text(size = 25),
+        legend.text = element_text(size = 20), 
+        legend.position = c(0.1,0.7),
+        plot.margin = margin(, 2, , , "cm")) # this is for avoiding the x-axis cutting
+
+
+```
+
+```{r cum litter}
+p_cbc_litter <- 
+  ggplot(CBC_lit_cum_yr_CI, aes(x=Date, y= mean, group = stands,col=stands))+
+  geom_line() + geom_point()+
+  geom_ribbon(aes(ymin = lower, ymax = upper, fill = stands), alpha = 0.1,linetype="dashed")+
+  ylab("D"[L]*" (g C m"^-2~")")+theme_bw() + 
+  ylim(-15,1000) + scale_x_date(date_breaks = "3 months", date_labels = "%b-%y") +
+  labs(color = "Stand", fill = "Stand") + #scale_alpha(guide = 'none') +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        title = element_text(size = 25),legend.title = element_text(size = 25),
+        legend.text = element_text(size = 20), legend.position = c(0.1,0.7),
+        plot.margin = margin(, 2, , , "cm"))  
+
+```
+
+
+```{r cum fine root}
+p_cbc_root <- 
+  CBC_root_cum_yr_CI %>% 
+  mutate(date = as.Date.character(paste0("01-", substring(MY,1,3), "-", substring(MY, 4,5)), 
+         format = "%d-%b-%y")) %>%   
+  ggplot(aes(x = date, y = mean, group = stands,col=stands)) +
+  geom_line() + geom_point()+
+  geom_ribbon(aes(ymin = lower, ymax = upper, fill = stands), alpha = 0.1,linetype="dashed")+
+  ylab("D"[FR]*" (g C m"^-2~")")+theme_bw() + 
+  ylim(-15,1000) + scale_x_date(date_breaks = "3 months", date_labels = "%b-%y") +
+  labs(color = "Stand", fill = "Stand") + #scale_alpha(guide = 'none') +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(size =25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        title = element_text(size = 25),legend.title = element_text(size = 25),
+        legend.text = element_text(size = 20), legend.position = c(0.1,0.7),
+        plot.margin = margin(, 2, , , "cm"))  
+```
+
+
+```{r combining main cmp flux}
+
+ggarrange(p_cbc_Rh + rremove("legend"), 
+          p_cbc_litter + rremove("legend"),
+          p_cbc_root + rremove("legend"),
+          ncol = 3, common.legend = T,
+          labels = c("(a)", "(b)", "(c)"), vjust = 2, hjust = -4.8,
+          font.label = list(size = 18))
+
+
+```
+
+```{r TBCF}
+balance_raw <- 
+  read_sheet("https://docs.google.com/spreadsheets/d/1mAvjZZHU6QzANVULKPTnQAf7BJ7tgJtJDmgdV6Y0xLk/edit#gid=0",
+                          col_types = "cnnnnnnnnnc")
+
+cbc_balance <-  balance_raw[1:33, 1:4] 
+colnames(cbc_balance) <- c("Var","AB", "IB", "NB")
+
+cbc_balance_TBCF_mean <-
+  cbc_balance %>%
+  filter(Var %in% c("NPP_fine", "TBCF","NPP_coarse", "Ra", "NPP_fungi")) %>%
+  pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "mean")
+
+cbc_balance_TBCF_se <-
+  cbc_balance %>%
+  filter(Var %in% c("NPP_fine_SE", "TBCF_SE","NPP_coarse_SE", "Ra_SE", "NPP_fungi_SE")) %>%
+  pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "SE")
+
+cbc_balance_TBCF <- cbind(cbc_balance_TBCF_mean, cbc_balance_TBCF_se[,3])
+
+ggplot(cbc_balance_TBCF , aes(stands, mean, fill = factor(Var, level = c("NPP_fine", "NPP_coarse", "NPP_fungi", "Ra", "TBCF")))) + 
+     theme_bw() +
+     geom_bar(position=position_dodge(),stat="identity")+ xlab("")+#ylab("")+
+     ylab(expression("Flux (g C m"^-2~"yr"^-1~")"))+
+     geom_hline(yintercept=0, color="black", size=1.5, alpha=0.4)+  
+     geom_errorbar(aes(ymin=mean - SE, ymax=mean+SE), width=.2,
+                   position=position_dodge(.9)) +
+   theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        legend.title = element_text(size = 25),legend.text = element_text(size = 25),
+        legend.position = "top") +
+  scale_fill_discrete(name = "",
+                      labels = c(bquote("NPP"[FR]),
+                                 bquote("NPP"[CR]),
+                                 bquote("NPP"[fungi]),
+                                 bquote("R"[a]),
+                                 "TBCF"))
+
+```
+
+
+
+```{r balance - component}
+cbc_annual_balance_mean <-
+  cbc_balance %>%
+  filter(Var %in% c("Mort", "Litterfall", "Rh", "disturbance")) %>%
+  pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "mean")
+
+cbc_annual_balance_se <-
+  cbc_balance %>%
+  filter(Var %in% c("Mort_SE", "Litterfall_SE","Rh_SE", "disturbance_SE")) %>%
+  pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "SE")
+
+cbc_annual_balance <- 
+  cbind(cbc_annual_balance_mean, cbc_annual_balance_se[,3]) %>%
+  mutate(mean_new = case_when(Var == "Rh" ~ -1*mean,
+                              Var == "disturbance" ~ -1*mean,
+                              TRUE ~ mean))
+
+p_cbc_cmp <-
+  ggplot(cbc_annual_balance, aes(stands, mean_new, fill = factor(Var, level = c("Litterfall", "Mort", "Rh", "disturbance")))) + 
+    theme_bw() +
+    geom_bar(position=position_dodge(),stat="identity")+ xlab("")+#ylab("")+
+    ylab(expression("Flux (g C m"^-2~"yr"^-1~")"))+
+     geom_hline(yintercept=0, color="black", size=1.5, alpha=0.4)+  
+     geom_errorbar(aes(ymin=mean_new - SE, ymax=mean_new+SE), width=.2,
+                   position=position_dodge(.9)) +
+   theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        legend.title = element_text(size = 25),legend.text = element_text(size = 25),
+        legend.position = "top") +
+  scale_fill_discrete(name = "",
+                      labels = c(bquote("D"[L]),
+                                 bquote("D"[FR]),
+                                 bquote("R"[h]),
+                                 "d"))
+
+
+```
+
+
+```{r net balance}
+p_cbc_net_balance <-
+  cbc_balance %>% 
+  filter(Var  == "Balance") %>%
+  pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "mean") %>%
+  cbind(cbc_balance %>% filter(Var == "Balance_SE") %>% 
+          pivot_longer(cols = c("AB","IB", "NB"),names_to = "stands", values_to = "SE") %>%
+          select(SE)) %>%
+  ggplot(aes(stands, mean, fill = stands)) + theme_bw() +
+     geom_bar(position=position_dodge(),stat="identity")+ xlab("")+#ylab("")+
+     ylab(expression("Flux (g C m"^-2~"yr"^-1~")"))+
+     geom_hline(yintercept=0, color="black", size=1.5, alpha=0.4)+  
+     geom_errorbar(aes(ymin=mean - SE, ymax=mean+SE), width=.2,
+                   position=position_dodge(.9)) +
+   theme(axis.title.x = element_blank(),axis.text.x = element_text(size = 25),
+        axis.title.y = element_text(size = 25),axis.text.y = element_text(size = 25),
+        legend.title = element_text(size = 25),legend.text = element_text(size = 25),
+        legend.position = "top")
+
+ggarrange(p_cbc_net_balance, p_cbc_cmp, 
+          ncol = 1, 
+          labels = c("(a)", "(b)"), vjust = 1, hjust = -4.5,
+          font.label = list(size = 18))
+```
