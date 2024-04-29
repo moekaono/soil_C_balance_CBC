@@ -1,0 +1,350 @@
+---
+title: "correlation cbc"
+author: "Moeka"
+date: "2023-12-25"
+output: html_document
+---
+
+
+```{r df for monthly variables}
+
+library(corrplot)
+
+setwd("G:/Shared drives/Project_CooksBranch/Data/SR/Processed data")
+
+rsrh_impute_corr <- read.csv("rsrh_impute.csv", sep = ",", header = T)
+
+
+# May21 for IBP3 - avg of the other 3 plots
+# Jun21 for NBP4 - min of the remainder
+# May21 in NB
+
+CBC_corr_SR <- rsrh_impute_corr %>%
+  mutate(plot_num = as.character(plot_num)) %>%
+# removing imputed values  
+  filter(
+    !(MY == "May21" & stands == "IB" & plot_num == "3") &
+    !(MY == "Jun21" & stands == "NB" & plot_num == "4") &
+    !(MY == "May21" & stands == "NB") 
+  ) %>%
+  select(c(stands, plot_num, MY, SR_mo_gC, Rh_season_mo_gC)) %>%
+  left_join(CBC_lit_mo %>% filter(!MY %in% c("Sep20", "Dec21", "Jan22")) %>% 
+              select(!v), by = c("MY","stands", "plot_num")) %>%
+  rename(SR = SR_mo_gC, Rh = Rh_season_mo_gC, D_L = litter)
+
+# adding temp
+CBC_corr_SR_v1 <- 
+  CBC_corr_SR %>%
+  left_join(sr_temp %>% group_by(stands, plot_num, MY) %>% 
+              summarise(Ts_mo = mean(Ts, na.rm = T)), by = c("MY","stands", "plot_num"))
+
+CBC_corr_root <- 
+  root_est %>%
+  rename(stands = Stands, plot_num = Plot) %>%
+  select(c(stands, plot_num, MY, DF_gC_mean, LF_gC_mean, starts_with("dcs"))) %>%
+  right_join(CBC_corr_SR_v1, by = c("MY","stands", "plot_num")) %>%
+  mutate(Ra = SR - Rh) %>%
+  rename(DF = DF_gC_mean, LF = LF_gC_mean) %>%
+  mutate(FR = DF + LF)
+
+CBC_corr_mo <-
+  CBC_corr_root %>%
+  select(-dcs2_p) %>%
+  rowwise() %>%
+  mutate(D_FR = mean(c_across(ends_with("_m"))),
+         NPP_FR = mean(c_across(ends_with("_p")))) %>%
+  mutate(NPP_fungi = Rh - D_L - NPP_FR) %>%
+  select(c(stands, plot_num, MY, SR, Rh, Ra, 
+            DF, LF, FR, D_FR, NPP_FR,
+            NPP_fungi, D_L, Ts_mo)) 
+
+
+cbc_mo_key <- 
+  CBC_corr_mo %>% 
+  select(stands, plot_num, MY, SR, Rh, Ra, D_L, FR, D_FR, NPP_FR,
+         NPP_fungi, Ts_mo)
+
+```
+
+
+```{r df for annual variables}
+cbc_annual_raw <-
+  read_sheet("https://docs.google.com/spreadsheets/d/1mAvjZZHU6QzANVULKPTnQAf7BJ7tgJtJDmgdV6Y0xLk/edit#gid=751977988", 
+             range = "Copy of CBC")
+
+cbc_annual <- 
+  cbc_annual_raw[1:12,] %>%
+  mutate(stands = substring(Site, 1,2),
+         plot = as.character(substring(Site, 4,4))) %>%
+  select(c(stands, plot, SR, Rh_season, Ra_season, Litter, NPP_coarse, TBCF_RE, Understory_veg,
+           `SR- Q10`, `Ra- Q10`,Ts_all,
+           dcs_avg_m, dcs_avg_p, `NPP fungi`, `full balance`, `simple balance`,
+           `Duff layer (gC m-2)`, `Duff depth (cm)`, `Rh:SR (dorm)`,`Rh:SR (grow)`,
+           `LF+DF`,`FR: 0-10 cm`, `FR: 10-20 cm`, `FR: 20-30 cm`, `FR: top 30 cm`,
+           `dbh_2020 (cm)`, `dbh_2021 (cm)`, `NPP1_20_21 (gC/m2)`, `NPP2_20_21 (gC/m2)`, 
+           `Tree density (per ac)`,`abg biomass (kg/ha)`, BNPP)) %>% 
+  mutate(across(3:33, as.numeric))
+
+colnames(cbc_annual) <- c("stands", "plot", "SR", "Rh", "Ra", "DL", "NPPcoarse", "TBCF", "Dunderstory",
+           "SR-Q10", "Ra-Q10", "Ts", "DFR", "NPPFR", "NPPfungi", "ASCB", "simple balance",
+           "Duff layer biomass", "Duff depth", "Rh:SR-dorm","Rh:SR-grow",
+           "FRB","FR: 0-10 cm", "FR: 10-20 cm", "FR: 20-30 cm", "FR: top 30 cm",
+           "dbh_2020", "dbh_2021", "NPP1_20_21", "NPP2_20_21", 
+           "Tree density","AGB", "BNPP")
+
+library(PerformanceAnalytics)
+
+cbc_annual_key <- 
+  cbc_annual %>% 
+  select(stands, SR, Rh, Ra, DL, TBCF, `Dunderstory`, DFR, NPPFR,
+         NPPfungi, `Duff layer biomass`, `FRB`, dbh_2020,  `NPP1_20_21`, `Tree density`,
+         `Rh:SR-dorm`,`Rh:SR-grow`,Ts,`AGB`,`BNPP`)
+
+```
+
+This function uses rcorr instead of cor function
+```{r function for corr table}
+#ref: http://www.sthda.com/english/wiki/elegant-correlation-table-using-xtable-r-package
+
+# x is a matrix containing the data
+# method : correlation method. "pearson"" or "spearman"" is supported
+# removeTriangle : remove upper or lower triangle
+# results :  if "html" or "latex"
+  # the results will be displayed in html or latex format
+corstars <-function(x, method=c("pearson", "spearman"), removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    library(xtable)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .001, "****", ifelse(p < .01, "*** ", ifelse(p < .05, "**  ", ifelse(p < .1, "*   ", "    "))))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove lower triangle of correlation matrix
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+      Rnew <- as.data.frame(Rnew)
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+} 
+```
+
+ref: https://cran.r-project.org/web/packages/corrplot/vignettes/corrplot-intro.html
+ref: https://rpubs.com/MajstorMaestro/240657
+
+```{r analysis for monthly}
+
+# overall
+M <- cor(cbc_mo_key[, -c(1:3)], use = "pairwise.complete.obs")
+mo_p <- cor.mtest(cbc_mo_key[, -c(1:3)], conf.level = 0.95)
+
+corrplot(M, p.mat = NB_p$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_mo
+text(p_mo$x, p_mo$y, round(p_mo$corr, 2))
+
+mo_component <- c("SR", "Rh", "Ra","$D[L]", "FRB", "$D[FR]", "$NPP[FR]", "$NPP[fungi]", "Ts")
+
+colnames(M) <- mo_component 
+rownames(M) <- mo_component 
+
+#  ellipse corr matrix
+## add significant level stars
+corrplot(M, p.mat = mo_p$p, method = 'ellipse', diag = FALSE, type = 'lower',
+         sig.level = c(0.001, 0.01, 0.05,0.1), pch.cex = 0.9, tl.col = "black",
+         insig = 'label_sig', pch.col = 'black')
+
+
+# AB
+M_AB <- cor(cbc_mo_key[cbc_mo_key$stands == "AB", -c(1:3)], use = "pairwise.complete.obs")
+AB_p <- cor.mtest(cbc_mo_key[cbc_mo_key$stands == "AB", -c(1:3)], conf.level = 0.95)
+
+colnames(M_AB) <- mo_component 
+rownames(M_AB) <- mo_component 
+
+#  ellipse corr matrix
+## add significant level stars
+corrplot(M_AB, p.mat = AB_p$p, method = 'ellipse', diag = FALSE, type = 'lower',
+         sig.level = c(0.001, 0.01, 0.05,0.1), pch.cex = 0.9, tl.col = "black",
+         insig = 'label_sig', pch.col = 'black')
+
+# IB
+M_IB <- cor(cbc_mo_key[cbc_mo_key$stands == "IB", -c(1:3)], use = "pairwise.complete.obs")
+IB_p <- cor.mtest(cbc_mo_key[cbc_mo_key$stands == "IB", -c(1:3)], conf.level = 0.95)
+
+colnames(M_IB) <- mo_component 
+rownames(M_IB) <- mo_component 
+
+#  ellipse corr matrix
+## add significant level stars
+corrplot(M_IB, p.mat = IB_p$p, method = 'ellipse', diag = FALSE, type = 'lower',
+         sig.level = c(0.001, 0.01, 0.05,0.1), pch.cex = 0.9, tl.col = "black",
+         insig = 'label_sig', pch.col = 'black')
+
+# NB
+M_NB <- cor(cbc_mo_key[cbc_mo_key$stands == "NB", -c(1:3)], use = "pairwise.complete.obs")
+NB_p <- cor.mtest(cbc_mo_key[cbc_mo_key$stands == "NB", -c(1:3)], conf.level = 0.95)
+
+colnames(M_NB) <- mo_component 
+rownames(M_NB) <- mo_component 
+
+#  ellipse corr matrix
+## add significant level stars
+corrplot(M_NB, p.mat = NB_p$p, method = 'ellipse', diag = FALSE, type = 'lower',
+         sig.level = c(0.001, 0.01, 0.05,0.1), pch.cex = 0.9, tl.col = "black",
+         insig = 'label_sig', pch.col = 'black')
+
+
+
+
+# setwd()
+
+# overview 
+corstars(CBC_corr_mo[,-c(1:3)], method =  "spearman", result="none") %>% 
+  write.table(file = "cbc_month.csv", sep = ",")
+
+
+# corstars(CBC_corr_mo[CBC_corr_mo$stands == "NB",-c(1:3)], method =  "spearman", result="none") %>% 
+#     write.table(file = "cbc_month_NB.csv", sep = ",")
+
+
+
+library(PerformanceAnalytics)
+
+# overview
+chart.Correlation(CBC_corr_mo[, -c(1:3)], 
+                  histogram = TRUE, pch = 19, method = "spearman")
+# stand
+chart.Correlation(CBC_corr[CBC_corr$stands == "AB", -c(1:3)], 
+                  histogram = TRUE, pch = 19, method = "spearman")
+
+
+
+
+# pearson is default
+M_AB<-cor(CBC_corr[CBC_corr$stands == "AB", c(3:11)], use = "pairwise.complete.obs")
+#corrplot(M_AB, type = "upper")
+
+# corrplot.mixed(M_AB,   
+#              lower = "number", 
+#              upper = "circle",
+#              tl.col = "black")
+
+
+AB_p <- cor.mtest(CBC_corr[CBC_corr$stands == "AB", c(3:11)], conf.level = 0.95)
+
+colSums(!is.na((CBC_corr[CBC_corr$stands == "AB", c(3:11)])))
+
+corrplot(M_AB, p.mat = AB_p$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_AB_mo
+text(p_AB_mo$x,  p_AB_mo$y, round(p_AB_mo$corr, 2))
+
+
+
+#
+# test - seasonal colar
+# ggplot(df, aes(SR_mo_gC, litter, col = factor(MY, level = MY_order))) + 
+#   geom_point() + 
+#   facet_wrap(~stands) + 
+#   theme_bw() +
+#   theme(axis.title.x = element_text(size = 20),axis.text.x = element_text(size = 20),
+#     axis.title.y = element_text(size = 20),axis.text.y = element_text(size = 20),
+#     legend.title = element_text(size = 15),legend.text = element_text(size = 15), 
+#     strip.text = element_text(size = 15))
+
+
+
+
+```
+
+
+```{r annual values analysis}
+
+# setwd()
+
+# overview 
+corstars(cbc_annual_key[, -1], method =  "spearman", result="none") %>% 
+  write.table(file = "cbc_annual.csv", sep = ",")
+
+
+# stand
+chart.Correlation(cbc_annual_key[cbc_annual_key$stands == "AB", -1], 
+                  histogram = TRUE, pch = 19, method = "spearman")
+
+# overall
+chart.Correlation(cbc_annual_key[, -1], 
+                  histogram = TRUE, pch = 19, method = "spearman")
+# ***: 0 - 0.001 **: 0.001 - 0.01 *: 0.01 - 0.05 •: 0.05 - 0.10
+
+library(corrplot)
+
+# pearson is default
+M_AB_yr <- cor(cbc_annual[cbc_annual$stands == "AB",c(3:28)])
+AB_p_yr <- cor.mtest(cbc_annual[cbc_annual$stands == "AB",c(3:28)], conf.level = 0.95)
+corrplot(M_AB_yr, p.mat = AB_p_yr$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_AB_yr
+text(p_AB_yr$x, p_AB_yr$y, round(p_AB_yr$corr, 2))
+
+M_IB_yr <- cor(cbc_annual[cbc_annual$stands == "IB",c(3:28)])
+IB_p_yr <- cor.mtest(cbc_annual[cbc_annual$stands == "IB",c(3:28)], conf.level = 0.95)
+corrplot(M_IB_yr, p.mat = IB_p_yr$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_IB_yr
+text(p_IB_yr$x, p_IB_yr$y, round(p_IB_yr$corr, 2))
+
+
+M_NB_yr <- cor(cbc_annual[cbc_annual$stands == "NB",c(3:28)])
+NB_p_yr <- cor.mtest(cbc_annual[cbc_annual$stands == "NB",c(3:28)], conf.level = 0.95)
+corrplot(M_NB_yr, p.mat = NB_p_yr$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_NB_yr
+text(p_NB_yr$x, p_NB_yr$y, round(p_NB_yr$corr, 2))
+
+# overall
+M_yr <- cor(cbc_annual_key[, -1], method = "spearman")
+M_p_yr <- cor.mtest(cbc_annual_key[, -1], conf.level = 0.95)
+corrplot(M_yr, p.mat = M_p_yr$p, method = 'circle', type = 'lower', insig='blank',
+         order = 'alphabet', diag = FALSE)$corrPos -> p_yr
+text(p_yr$x, p_yr$y, round(p_yr$corr, 2))
+
+
+
+
+# ref: https://stackoverflow.com/questions/63041749/how-to-include-superscript-in-corrplot-label
+colnames(M_yr) <- c("SR", "Rh", "Ra","$D[L]", "TBCF", "$D[understory]", "$D[FR]", "$NPP[FR]", "$NPP[fungi]", "DL",
+                    "FRB", "DBH", "NPP", "TD", "Rh:SR-dorm", "Rh:SR-grow", "Ts", "AGB", "BNPP")
+rownames(M_yr) <- c("SR", "Rh", "Ra","$D[L]", "TBCF", "$D[understory]", "$D[FR]", "$NPP[FR]", "$NPP[fungi]", "DL",
+                    "FRB", "DBH", "NPP", "TD", "Rh:SR-dorm", "Rh:SR-grow", "Ts", "AGB", "BNPP")
+
+#  ellipse corr matrix
+## add significant level stars
+corrplot(M_yr, p.mat = M_p_yr$p, method = 'ellipse', diag = FALSE, type = 'lower',
+         sig.level = c(0.001, 0.01, 0.05,0.1), pch.cex = 0.9, tl.col = "black",
+         insig = 'label_sig', pch.col = 'grey20')
+
+```
