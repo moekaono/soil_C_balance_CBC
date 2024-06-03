@@ -10,20 +10,26 @@ cbc_mo_raw <- read.csv("cbc_mo_var.csv")
 # change dtype
 cbc_mo <- 
   cbc_mo_raw %>%
-  mutate(across(D_FR:vwc, as.numeric)) %>%
-  mutate(new_pl = paste0(stands, "P", plot_num)) %>% 
+  filter(MY %in% c("20-Oct", "20-Nov", "20-Dec", 
+                 "21-Jan", "21-Feb", "21-Mar", "21-Apr", "21-May", "21-Jun", 
+                 "21-Jul", "21-Aug", "21-Sep")) %>%
+  mutate(across(D_FR:LF_gC_mean, as.numeric)) %>%
+  mutate(
+    new_pl = paste0(stands, "P", plot_num),
+    NPP_fungi = D_FR - P_FR,
+    FR_mass_gC = LF_gC_mean + DF_gC_mean) %>% 
   rename("SR_flux" = "SR",
          "SR" = "SR_mo_gC", 
          "Rh" = "Rh_season_mo_gC",
          "Ra" = "Ra_mo_gC") # all gC/m2/mo
 ```
 
-    ## Warning: There were 3 warnings in `mutate()`.
+    ## Warning: There were 2 warnings in `mutate()`.
     ## The first warning was:
-    ## ℹ In argument: `across(D_FR:vwc, as.numeric)`.
+    ## ℹ In argument: `across(D_FR:LF_gC_mean, as.numeric)`.
     ## Caused by warning:
     ## ! NAs introduced by coercion
-    ## ℹ Run `dplyr::last_dplyr_warnings()` to see the 2 remaining warnings.
+    ## ℹ Run `dplyr::last_dplyr_warnings()` to see the 1 remaining warning.
 
 ``` r
 cbc_mo[cbc_mo == '#DIV/0!'] <- NA
@@ -39,7 +45,7 @@ MY_order_v1 <- c("20-Jul", "20-Aug", "20-Sep", "20-Oct", "20-Nov", "20-Dec",
 cbc_mo$MY <- factor(cbc_mo$MY, level = MY_order_v1)
 
 # interested variavles
-vars <- c("D_FR","P_FR", "SR","Rh","Ra", "D_L", "Ts","vwc")
+vars <- c("D_FR","P_FR", "SR","Rh","Ra", "D_L", "Ts","vwc", "FR_mass_gC", "NPP_fungi")
 ```
 
 REFERENCE: <https://www.datanovia.com/en/lessons/mixed-anova-in-r/>
@@ -59,12 +65,12 @@ sphericity, and (5) homogeneity of covariances.
 # log transformation
 cbc_mo_log <- 
   cbc_mo %>%
-  mutate(across(D_FR:vwc, log))
+  mutate(across(D_FR:LF_gC_mean, log))
 ```
 
     ## Warning: There were 4 warnings in `mutate()`.
     ## The first warning was:
-    ## ℹ In argument: `across(D_FR:vwc, log)`.
+    ## ℹ In argument: `across(D_FR:LF_gC_mean, log)`.
     ## Caused by warning:
     ## ! NaNs produced
     ## ℹ Run `dplyr::last_dplyr_warnings()` to see the 3 remaining warnings.
@@ -73,12 +79,12 @@ cbc_mo_log <-
 # sqrt
 cbc_mo_sqrt <- 
   cbc_mo %>%
-  mutate(across(D_FR:vwc, sqrt))
+  mutate(across(D_FR:LF_gC_mean, sqrt))
 ```
 
     ## Warning: There were 4 warnings in `mutate()`.
     ## The first warning was:
-    ## ℹ In argument: `across(D_FR:vwc, sqrt)`.
+    ## ℹ In argument: `across(D_FR:LF_gC_mean, sqrt)`.
     ## Caused by warning:
     ## ! NaNs produced
     ## ℹ Run `dplyr::last_dplyr_warnings()` to see the 3 remaining warnings.
@@ -86,7 +92,7 @@ cbc_mo_sqrt <-
 ``` r
 # box-cox transformation
 bc_trans <- function(df){
-  output <- cbc_mo[,c(1:3, 28)]
+  output <- cbc_mo[,c(1:3,30)]
   summary <- data.frame(var = NULL, skewness = NULL, lambda = NULL)
   
   
@@ -101,20 +107,22 @@ bc_trans <- function(df){
 
 # 2 layers
 cbc_mo_bc <- bc_trans(cbc_mo) 
-colnames(cbc_mo_bc[[1]])[5:12] <- vars
+colnames(cbc_mo_bc[[1]])[5:14] <- vars
 
 cbc_mo_bc[[2]]
 ```
 
-    ##    var           skewness lambda
-    ## 1 D_FR   1.40887926456789    0.3
-    ## 2 P_FR  0.467229693280081   <NA>
-    ## 3   SR  0.788254287268379    0.4
-    ## 4   Rh   0.83534567202595    0.3
-    ## 5   Ra   1.08627410710574    0.2
-    ## 6  D_L    1.1527898873942    0.2
-    ## 7   Ts -0.255836140348404    1.2
-    ## 8  vwc  0.784857334243315   <NA>
+    ##           var           skewness lambda
+    ## 1        D_FR   1.39811459598347    0.3
+    ## 2        P_FR  0.455140218648749   <NA>
+    ## 3          SR  0.638065314470547    0.4
+    ## 4          Rh  0.413641802561403    0.5
+    ## 5          Ra   1.13496572856835    0.2
+    ## 6         D_L  0.996947287758875    0.3
+    ## 7          Ts -0.223246100370724    1.1
+    ## 8         vwc  0.695463861708537    0.5
+    ## 9  FR_mass_gC  0.337635067873747    0.3
+    ## 10  NPP_fungi  0.565069426287239   <NA>
 
 ``` r
 # inverse
@@ -141,52 +149,40 @@ density_plot <- function(df, title){
 density_plot(cbc_mo, "Raw data")
 ```
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
 ![](CBC_mo_LMM_files/figure-gfm/density%20plot-1.png)<!-- -->
@@ -196,16 +192,9 @@ density_plot(cbc_mo, "Raw data")
 density_plot(cbc_mo_log, "Log-transformed data")
 ```
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
-
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 144 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 144 rows containing non-finite outside the scale range
+    ## Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
     ## Warning: Removed 60 rows containing non-finite outside the scale range
@@ -214,34 +203,28 @@ density_plot(cbc_mo_log, "Log-transformed data")
     ## Warning: Removed 60 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 94 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 94 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
 ![](CBC_mo_LMM_files/figure-gfm/density%20plot-2.png)<!-- -->
@@ -251,52 +234,39 @@ density_plot(cbc_mo_log, "Log-transformed data")
 density_plot(cbc_mo_sqrt, "Square-Root Transformation")
 ```
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
-
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 111 rows containing non-finite outside the scale range
+    ## Warning: Removed 28 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 111 rows containing non-finite outside the scale range
+    ## Warning: Removed 28 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
 ![](CBC_mo_LMM_files/figure-gfm/density%20plot-3.png)<!-- -->
@@ -306,52 +276,39 @@ density_plot(cbc_mo_sqrt, "Square-Root Transformation")
 density_plot(cbc_mo_bc[[1]], "Box-Cox Transformation")
 ```
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
-
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 95 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 14 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 20 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 60 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_density()`).
 
-    ## Warning: Removed 35 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 82 rows containing non-finite outside the scale range
-    ## (`stat_overlay_normal_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
-    ## (`stat_density()`).
-
-    ## Warning: Removed 93 rows containing non-finite outside the scale range
+    ## Warning: Removed 12 rows containing non-finite outside the scale range
     ## (`stat_overlay_normal_density()`).
 
 ![](CBC_mo_LMM_files/figure-gfm/density%20plot-4.png)<!-- -->
@@ -420,7 +377,8 @@ to get the normality as close as possible.
 
 ``` r
 MY_order_v1 <- c("20-Aug","20-Sep", "20-Oct", "20-Nov", "20-Dec", 
-                 "21-Jan", "21-Feb", "21-Mar", "21-Apr", "21-May", "21-Jun", "21-Jul", "21-Aug", "21-Sep", "21-Oct", "21-Nov", "21-Dec", 
+                 "21-Jan", "21-Feb", "21-Mar", "21-Apr", "21-May", 
+                 "21-Jun", "21-Jul", "21-Aug", "21-Sep", "21-Oct", "21-Nov", "21-Dec", 
                  "22-Jan")
 ```
 
@@ -439,82 +397,79 @@ missing data and requires different assumptions
 cbc_mo_bc_SR <- 
   cbc_mo_bc[[1]] %>% filter(!MY %in% c("21-Aug", "21-Sep"))
 
-m_SR <- lmerTest::lmer(SR ~ stands*MY+(1|new_pl), cbc_mo_bc_SR)
+m_SR <- lmerTest::lmer(SR ~ stands + MY +(1|new_pl), cbc_mo_bc_SR)
+#m_SR <- lmerTest::lmer(SR ~ stands*MY+(1|new_pl), cbc_mo_bc_SR)
 summary(m_SR)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: SR ~ stands * MY + (1 | new_pl)
+    ## Formula: SR ~ stands + MY + (1 | new_pl)
     ##    Data: cbc_mo_bc_SR
     ## 
-    ## REML criterion at convergence: 423.3
+    ## REML criterion at convergence: 420.2
     ## 
     ## Scaled residuals: 
     ##      Min       1Q   Median       3Q      Max 
-    ## -2.48990 -0.59319  0.00547  0.55514  2.47546 
+    ## -3.02821 -0.61388  0.01615  0.70728  2.09735 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
-    ##  new_pl   (Intercept) 0.1915   0.4376  
-    ##  Residual             1.7322   1.3161  
-    ## Number of obs: 144, groups:  new_pl, 12
+    ##  new_pl   (Intercept) 0.3235   0.5688  
+    ##  Residual             1.9821   1.4079  
+    ## Number of obs: 120, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error       df t value Pr(>|t|)    
-    ## (Intercept)        19.8577     0.6935  97.3878  28.635  < 2e-16 ***
-    ## standsIB           -3.8841     0.9807  97.3878  -3.960 0.000142 ***
-    ## standsNB           -5.0193     0.9807  97.3878  -5.118 1.55e-06 ***
-    ## MY20-Sep           -3.3961     0.9306  99.0000  -3.649 0.000422 ***
-    ## MY20-Oct           -4.8149     0.9306  99.0000  -5.174 1.20e-06 ***
-    ## MY20-Nov           -7.6064     0.9306  99.0000  -8.173 1.02e-12 ***
-    ## MY20-Dec           -9.2567     0.9306  99.0000  -9.947  < 2e-16 ***
-    ## MY21-Jan          -10.8133     0.9306  99.0000 -11.619  < 2e-16 ***
-    ## MY21-Feb          -11.6674     0.9306  99.0000 -12.537  < 2e-16 ***
-    ## MY21-Mar          -10.5096     0.9306  99.0000 -11.293  < 2e-16 ***
-    ## MY21-Apr           -7.2098     0.9306  99.0000  -7.747 8.32e-12 ***
-    ## MY21-May           -6.5703     0.9306  99.0000  -7.060 2.32e-10 ***
-    ## MY21-Jun           -5.1212     0.9306  99.0000  -5.503 2.94e-07 ***
-    ## MY21-Jul           -5.7480     0.9306  99.0000  -6.176 1.46e-08 ***
-    ## standsIB:MY20-Sep   4.3114     1.3161  99.0000   3.276 0.001453 ** 
-    ## standsNB:MY20-Sep   8.8080     1.3161  99.0000   6.692 1.33e-09 ***
-    ## standsIB:MY20-Oct   3.0390     1.3161  99.0000   2.309 0.023021 *  
-    ## standsNB:MY20-Oct   5.3170     1.3161  99.0000   4.040 0.000106 ***
-    ## standsIB:MY20-Nov   3.7533     1.3161  99.0000   2.852 0.005293 ** 
-    ## standsNB:MY20-Nov   5.2606     1.3161  99.0000   3.997 0.000124 ***
-    ## standsIB:MY20-Dec   2.7120     1.3161  99.0000   2.061 0.041968 *  
-    ## standsNB:MY20-Dec   4.7819     1.3161  99.0000   3.633 0.000446 ***
-    ## standsIB:MY21-Jan   1.7070     1.3161  99.0000   1.297 0.197644    
-    ## standsNB:MY21-Jan   4.2170     1.3161  99.0000   3.204 0.001824 ** 
-    ## standsIB:MY21-Feb   4.4014     1.3161  99.0000   3.344 0.001166 ** 
-    ## standsNB:MY21-Feb   5.3646     1.3161  99.0000   4.076 9.26e-05 ***
-    ## standsIB:MY21-Mar   5.6030     1.3161  99.0000   4.257 4.71e-05 ***
-    ## standsNB:MY21-Mar   7.9668     1.3161  99.0000   6.053 2.55e-08 ***
-    ## standsIB:MY21-Apr   1.6434     1.3161  99.0000   1.249 0.214736    
-    ## standsNB:MY21-Apr   6.4399     1.3161  99.0000   4.893 3.85e-06 ***
-    ## standsIB:MY21-May   2.0360     1.3161  99.0000   1.547 0.125057    
-    ## standsNB:MY21-May   7.0274     1.3161  99.0000   5.339 5.94e-07 ***
-    ## standsIB:MY21-Jun   3.7131     1.3161  99.0000   2.821 0.005781 ** 
-    ## standsNB:MY21-Jun   6.2415     1.3161  99.0000   4.742 7.10e-06 ***
-    ## standsIB:MY21-Jul   5.3411     1.3161  99.0000   4.058 9.89e-05 ***
-    ## standsNB:MY21-Jul   8.1178     1.3161  99.0000   6.168 1.51e-08 ***
+    ##             Estimate Std. Error      df t value Pr(>|t|)    
+    ## (Intercept)  14.6720     0.5283 36.8555  27.773  < 2e-16 ***
+    ## standsIB     -0.4891     0.5107  9.0000  -0.958  0.36324    
+    ## standsNB      1.0542     0.5107  9.0000   2.064  0.06902 .  
+    ## MY20-Nov     -2.5723     0.5748 99.0000  -4.475 2.04e-05 ***
+    ## MY20-Dec     -4.7292     0.5748 99.0000  -8.228 7.77e-13 ***
+    ## MY21-Jan     -6.8091     0.5748 99.0000 -11.847  < 2e-16 ***
+    ## MY21-Feb     -6.3825     0.5748 99.0000 -11.105  < 2e-16 ***
+    ## MY21-Mar     -3.9568     0.5748 99.0000  -6.884 5.37e-10 ***
+    ## MY21-Apr     -2.4858     0.5748 99.0000  -4.325 3.64e-05 ***
+    ## MY21-May     -1.5196     0.5748 99.0000  -2.644  0.00953 ** 
+    ## MY21-Jun      0.2266     0.5748 99.0000   0.394  0.69426    
+    ## MY21-Jul      0.7678     0.5748 99.0000   1.336  0.18465    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 36 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB stndNB MY20-N MY20-D MY21-Jan MY21-F MY21-Mr MY21-A
+    ## standsIB -0.483                                                           
+    ## standsNB -0.483  0.500                                                    
+    ## MY20-Nov -0.544  0.000  0.000                                             
+    ## MY20-Dec -0.544  0.000  0.000  0.500                                      
+    ## MY21-Jan -0.544  0.000  0.000  0.500  0.500                               
+    ## MY21-Feb -0.544  0.000  0.000  0.500  0.500  0.500                        
+    ## MY21-Mar -0.544  0.000  0.000  0.500  0.500  0.500    0.500               
+    ## MY21-Apr -0.544  0.000  0.000  0.500  0.500  0.500    0.500  0.500        
+    ## MY21-May -0.544  0.000  0.000  0.500  0.500  0.500    0.500  0.500   0.500
+    ## MY21-Jun -0.544  0.000  0.000  0.500  0.500  0.500    0.500  0.500   0.500
+    ## MY21-Jul -0.544  0.000  0.000  0.500  0.500  0.500    0.500  0.500   0.500
+    ##          MY21-My MY21-Jun
+    ## standsIB                 
+    ## standsNB                 
+    ## MY20-Nov                 
+    ## MY20-Dec                 
+    ## MY21-Jan                 
+    ## MY21-Feb                 
+    ## MY21-Mar                 
+    ## MY21-Apr                 
+    ## MY21-May                 
+    ## MY21-Jun  0.500          
+    ## MY21-Jul  0.500   0.500
 
 ``` r
 anova(m_SR)
 ```
 
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
-    ## stands      22.36  11.182     2     9  6.4553   0.01824 *  
-    ## MY        1345.45 122.314    11    99 70.6113 < 2.2e-16 ***
-    ## stands:MY  152.66   6.939    22    99  4.0059 9.682e-07 ***
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)    
+    ## stands  18.91   9.454     2     9  4.7695 0.0387 *  
+    ## MY     785.50  87.277     9    99 44.0330 <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -524,89 +479,53 @@ r2_nakagawa(m_SR)
 
     ## # R2 for Mixed Models
     ## 
-    ##   Conditional R2: 0.864
-    ##      Marginal R2: 0.849
+    ##   Conditional R2: 0.787
+    ##      Marginal R2: 0.753
 
 ``` r
 # Rh
-m_Rh <- lmerTest::lmer(Rh ~ stands*MY +(1|new_pl), cbc_mo_bc_SR)
+m_Rh <- lmerTest::lmer(Rh ~ stands +(1|new_pl), cbc_mo_bc_SR)
+#m_Rh <- lmerTest::lmer(Rh ~ stands*MY +(1|new_pl), cbc_mo_bc_SR)
 summary(m_Rh)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: Rh ~ stands * MY + (1 | new_pl)
+    ## Formula: Rh ~ stands + (1 | new_pl)
     ##    Data: cbc_mo_bc_SR
     ## 
-    ## REML criterion at convergence: 329.1
+    ## REML criterion at convergence: 617.4
     ## 
     ## Scaled residuals: 
     ##      Min       1Q   Median       3Q      Max 
-    ## -2.01817 -0.66566  0.02911  0.65156  1.85089 
+    ## -2.04234 -0.66318 -0.03636  0.79305  2.02326 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
-    ##  new_pl   (Intercept) 0.3567   0.5973  
-    ##  Residual             0.6564   0.8102  
-    ## Number of obs: 144, groups:  new_pl, 12
+    ##  new_pl   (Intercept) 1.066    1.033   
+    ##  Residual             9.851    3.139   
+    ## Number of obs: 120, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error      df t value Pr(>|t|)    
-    ## (Intercept)        10.9669     0.5033 45.6889  21.791  < 2e-16 ***
-    ## standsIB           -2.2258     0.7117 45.6889  -3.127 0.003067 ** 
-    ## standsNB           -2.8482     0.7117 45.6889  -4.002 0.000228 ***
-    ## MY20-Sep           -1.6558     0.5729 99.0000  -2.890 0.004731 ** 
-    ## MY20-Oct           -2.3685     0.5729 99.0000  -4.134 7.46e-05 ***
-    ## MY20-Nov           -3.1546     0.5729 99.0000  -5.507 2.89e-07 ***
-    ## MY20-Dec           -4.1027     0.5729 99.0000  -7.162 1.43e-10 ***
-    ## MY21-Jan           -5.0804     0.5729 99.0000  -8.868 3.21e-14 ***
-    ## MY21-Feb           -5.5385     0.5729 99.0000  -9.668 5.80e-16 ***
-    ## MY21-Mar           -4.8580     0.5729 99.0000  -8.480 2.22e-13 ***
-    ## MY21-Apr           -2.9293     0.5729 99.0000  -5.113 1.55e-06 ***
-    ## MY21-May           -3.2900     0.5729 99.0000  -5.743 1.02e-07 ***
-    ## MY21-Jun           -2.5562     0.5729 99.0000  -4.462 2.15e-05 ***
-    ## MY21-Jul           -2.8775     0.5729 99.0000  -5.023 2.26e-06 ***
-    ## standsIB:MY20-Sep   2.1214     0.8102 99.0000   2.618 0.010220 *  
-    ## standsNB:MY20-Sep   4.2555     0.8102 99.0000   5.253 8.61e-07 ***
-    ## standsIB:MY20-Oct   1.5089     0.8102 99.0000   1.862 0.065506 .  
-    ## standsNB:MY20-Oct   2.6417     0.8102 99.0000   3.261 0.001525 ** 
-    ## standsIB:MY20-Nov   1.8501     0.8102 99.0000   2.284 0.024531 *  
-    ## standsNB:MY20-Nov   2.4674     0.8102 99.0000   3.046 0.002977 ** 
-    ## standsIB:MY20-Dec   1.2759     0.8102 99.0000   1.575 0.118474    
-    ## standsNB:MY20-Dec   2.2796     0.8102 99.0000   2.814 0.005907 ** 
-    ## standsIB:MY21-Jan   0.7122     0.8102 99.0000   0.879 0.381481    
-    ## standsNB:MY21-Jan   2.0729     0.8102 99.0000   2.559 0.012025 *  
-    ## standsIB:MY21-Feb   2.2832     0.8102 99.0000   2.818 0.005831 ** 
-    ## standsNB:MY21-Feb   2.6437     0.8102 99.0000   3.263 0.001513 ** 
-    ## standsIB:MY21-Mar   2.9634     0.8102 99.0000   3.658 0.000410 ***
-    ## standsNB:MY21-Mar   4.1067     0.8102 99.0000   5.069 1.86e-06 ***
-    ## standsIB:MY21-Apr   0.6659     0.8102 99.0000   0.822 0.413077    
-    ## standsNB:MY21-Apr   3.1563     0.8102 99.0000   3.896 0.000178 ***
-    ## standsIB:MY21-May   1.0185     0.8102 99.0000   1.257 0.211647    
-    ## standsNB:MY21-May   3.5415     0.8102 99.0000   4.371 3.05e-05 ***
-    ## standsIB:MY21-Jun   1.8950     0.8102 99.0000   2.339 0.021347 *  
-    ## standsNB:MY21-Jun   3.1236     0.8102 99.0000   3.856 0.000205 ***
-    ## standsIB:MY21-Jul   2.7106     0.8102 99.0000   3.346 0.001161 ** 
-    ## standsNB:MY21-Jul   4.0168     0.8102 99.0000   4.958 2.95e-06 ***
+    ##             Estimate Std. Error      df t value Pr(>|t|)    
+    ## (Intercept)  11.9545     0.7161  9.0000  16.694 4.44e-08 ***
+    ## standsIB     -1.1363     1.0127  9.0000  -1.122    0.291    
+    ## standsNB      0.3621     1.0127  9.0000   0.358    0.729    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 36 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.707       
+    ## standsNB -0.707  0.500
 
 ``` r
 anova(m_Rh)
 ```
 
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
-    ## stands      1.783  0.8915     2     9  1.3583 0.3051394    
-    ## MY        274.479 24.9527    11    99 38.0159 < 2.2e-16 ***
-    ## stands:MY  40.379  1.8354    22    99  2.7963 0.0002756 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
+    ## stands 23.488  11.744     2     9  1.1921 0.3473
 
 ``` r
 r2_nakagawa(m_Rh)
@@ -614,89 +533,53 @@ r2_nakagawa(m_Rh)
 
     ## # R2 for Mixed Models
     ## 
-    ##   Conditional R2: 0.802
-    ##      Marginal R2: 0.694
+    ##   Conditional R2: 0.130
+    ##      Marginal R2: 0.036
 
 ``` r
 # Ra
-m_Ra <- lmerTest::lmer(Ra ~ stands*MY +(1|new_pl), cbc_mo_bc_SR)
+m_Ra <- lmerTest::lmer(Ra ~ stands +(1|new_pl), cbc_mo_bc_SR)
+#m_Ra <- lmerTest::lmer(Ra ~ stands*MY +(1|new_pl), cbc_mo_bc_SR)
 summary(m_Ra)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: Ra ~ stands * MY + (1 | new_pl)
+    ## Formula: Ra ~ stands + (1 | new_pl)
     ##    Data: cbc_mo_bc_SR
     ## 
-    ## REML criterion at convergence: 249.6
+    ## REML criterion at convergence: 410.6
     ## 
     ## Scaled residuals: 
     ##      Min       1Q   Median       3Q      Max 
-    ## -1.75732 -0.56800 -0.03469  0.52878  2.42746 
+    ## -1.83351 -0.70713  0.05712  0.80281  1.97306 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
-    ##  new_pl   (Intercept) 0.2731   0.5226  
-    ##  Residual             0.3028   0.5503  
-    ## Number of obs: 144, groups:  new_pl, 12
+    ##  new_pl   (Intercept) 0.1512   0.3888  
+    ##  Residual             1.6948   1.3018  
+    ## Number of obs: 120, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error      df t value Pr(>|t|)    
-    ## (Intercept)         7.7122     0.3794 31.0894  20.325  < 2e-16 ***
-    ## standsIB           -0.9155     0.5366 31.0894  -1.706 0.097975 .  
-    ## standsNB           -1.2546     0.5366 31.0894  -2.338 0.025997 *  
-    ## MY20-Sep           -1.0000     0.3891 99.0000  -2.570 0.011656 *  
-    ## MY20-Oct           -1.4515     0.3891 99.0000  -3.731 0.000319 ***
-    ## MY20-Nov           -3.1050     0.3891 99.0000  -7.980 2.65e-12 ***
-    ## MY20-Dec           -3.6910     0.3891 99.0000  -9.486 1.45e-15 ***
-    ## MY21-Jan           -4.2245     0.3891 99.0000 -10.857  < 2e-16 ***
-    ## MY21-Feb           -4.5388     0.3891 99.0000 -11.665  < 2e-16 ***
-    ## MY21-Mar           -4.0876     0.3891 99.0000 -10.506  < 2e-16 ***
-    ## MY21-Apr           -2.9801     0.3891 99.0000  -7.659 1.28e-11 ***
-    ## MY21-May           -2.0325     0.3891 99.0000  -5.224 9.73e-07 ***
-    ## MY21-Jun           -1.5424     0.3891 99.0000  -3.964 0.000139 ***
-    ## MY21-Jul           -1.7968     0.3891 99.0000  -4.618 1.17e-05 ***
-    ## standsIB:MY20-Sep   1.2782     0.5503 99.0000   2.323 0.022226 *  
-    ## standsNB:MY20-Sep   2.6764     0.5503 99.0000   4.864 4.34e-06 ***
-    ## standsIB:MY20-Oct   0.8598     0.5503 99.0000   1.562 0.121363    
-    ## standsNB:MY20-Oct   1.6164     0.5503 99.0000   2.938 0.004115 ** 
-    ## standsIB:MY20-Nov   1.3141     0.5503 99.0000   2.388 0.018832 *  
-    ## standsNB:MY20-Nov   1.8852     0.5503 99.0000   3.426 0.000893 ***
-    ## standsIB:MY20-Dec   0.9340     0.5503 99.0000   1.697 0.092764 .  
-    ## standsNB:MY20-Dec   1.7003     0.5503 99.0000   3.090 0.002598 ** 
-    ## standsIB:MY21-Jan   0.4315     0.5503 99.0000   0.784 0.434814    
-    ## standsNB:MY21-Jan   1.4114     0.5503 99.0000   2.565 0.011818 *  
-    ## standsIB:MY21-Feb   1.5170     0.5503 99.0000   2.757 0.006950 ** 
-    ## standsNB:MY21-Feb   1.8644     0.5503 99.0000   3.388 0.001011 ** 
-    ## standsIB:MY21-Mar   1.9471     0.5503 99.0000   3.539 0.000614 ***
-    ## standsNB:MY21-Mar   2.7941     0.5503 99.0000   5.078 1.80e-06 ***
-    ## standsIB:MY21-Apr   0.5998     0.5503 99.0000   1.090 0.278362    
-    ## standsNB:MY21-Apr   2.2698     0.5503 99.0000   4.125 7.73e-05 ***
-    ## standsIB:MY21-May   0.4530     0.5503 99.0000   0.823 0.412301    
-    ## standsNB:MY21-May   2.1823     0.5503 99.0000   3.966 0.000138 ***
-    ## standsIB:MY21-Jun   1.0668     0.5503 99.0000   1.939 0.055382 .  
-    ## standsNB:MY21-Jun   1.9061     0.5503 99.0000   3.464 0.000788 ***
-    ## standsIB:MY21-Jul   1.6540     0.5503 99.0000   3.006 0.003357 ** 
-    ## standsNB:MY21-Jul   2.5666     0.5503 99.0000   4.664 9.70e-06 ***
+    ##             Estimate Std. Error     df t value Pr(>|t|)    
+    ## (Intercept)   4.7672     0.2831 9.0000  16.837 4.12e-08 ***
+    ## standsIB      0.1622     0.4004 9.0000   0.405   0.6948    
+    ## standsNB      0.7651     0.4004 9.0000   1.911   0.0884 .  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 36 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.707       
+    ## standsNB -0.707  0.500
 
 ``` r
 anova(m_Ra)
 ```
 
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq Mean Sq NumDF DenDF F value    Pr(>F)    
-    ## stands      1.013  0.5066     2     9  1.6730  0.241112    
-    ## MY        239.121 21.7383    11    99 71.7951 < 2.2e-16 ***
-    ## stands:MY  16.554  0.7525    22    99  2.4852  0.001193 ** 
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
+    ## stands 6.8716  3.4358     2     9  2.0273 0.1876
 
 ``` r
 r2_nakagawa(m_Ra)
@@ -704,8 +587,8 @@ r2_nakagawa(m_Ra)
 
     ## # R2 for Mixed Models
     ## 
-    ##   Conditional R2: 0.876
-    ##      Marginal R2: 0.765
+    ##   Conditional R2: 0.133
+    ##      Marginal R2: 0.056
 
 ``` r
 # D_L
@@ -714,84 +597,48 @@ cbc_mo_bc_DL <-
   cbc_mo_bc[[1]] %>% 
   filter(!MY %in% c("20-Aug", "20-Sep", "20-Oct", "20-Nov", "21-Dec", "22-Jan"))
                      
-m_DL <- lmerTest::lmer(D_L ~ stands*MY +(1|new_pl),cbc_mo_bc_DL)
+m_DL <- lmerTest::lmer(D_L ~ stands +(1|new_pl),cbc_mo_bc_DL)
+#m_DL <- lmerTest::lmer(D_L ~ stands*MY +(1|new_pl),cbc_mo_bc_DL)
 summary(m_DL)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: D_L ~ stands * MY + (1 | new_pl)
+    ## Formula: D_L ~ stands + (1 | new_pl)
     ##    Data: cbc_mo_bc_DL
     ## 
-    ## REML criterion at convergence: 249.8
+    ## REML criterion at convergence: 421.4
     ## 
     ## Scaled residuals: 
     ##      Min       1Q   Median       3Q      Max 
-    ## -2.53374 -0.56266  0.01737  0.46864  2.64810 
+    ## -2.78341 -0.54239 -0.07567  0.41527  2.45426 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
-    ##  new_pl   (Intercept) 0.1240   0.3521  
-    ##  Residual             0.3229   0.5682  
-    ## Number of obs: 144, groups:  new_pl, 12
+    ##  new_pl   (Intercept) 0.08441  0.2905  
+    ##  Residual             1.89805  1.3777  
+    ## Number of obs: 120, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error       df t value Pr(>|t|)    
-    ## (Intercept)        5.58164    0.33424 58.47140  16.700  < 2e-16 ***
-    ## standsIB          -0.45159    0.47268 58.47140  -0.955 0.343325    
-    ## standsNB           0.43994    0.47268 58.47140   0.931 0.355820    
-    ## MY21-Jan          -0.91022    0.40178 99.00001  -2.265 0.025662 *  
-    ## MY21-Feb          -3.31586    0.40178 99.00001  -8.253 6.87e-13 ***
-    ## MY21-Mar          -1.73029    0.40178 99.00001  -4.307 3.91e-05 ***
-    ## MY21-Apr          -1.59923    0.40178 99.00001  -3.980 0.000131 ***
-    ## MY21-May          -1.55541    0.40178 99.00001  -3.871 0.000194 ***
-    ## MY21-Jun          -1.61381    0.40178 99.00001  -4.017 0.000115 ***
-    ## MY21-Jul          -1.66513    0.40178 99.00001  -4.144 7.19e-05 ***
-    ## MY21-Aug          -1.61506    0.40178 99.00001  -4.020 0.000114 ***
-    ## MY21-Sep          -0.26100    0.40178 99.00001  -0.650 0.517448    
-    ## MY21-Oct           0.21586    0.40178 99.00001   0.537 0.592293    
-    ## MY21-Nov           0.92858    0.40178 99.00001   2.311 0.022899 *  
-    ## standsIB:MY21-Jan -0.37330    0.56821 99.00001  -0.657 0.512716    
-    ## standsNB:MY21-Jan -0.93228    0.56821 99.00001  -1.641 0.104025    
-    ## standsIB:MY21-Feb  0.14916    0.56821 99.00001   0.263 0.793468    
-    ## standsNB:MY21-Feb  0.23912    0.56821 99.00001   0.421 0.674789    
-    ## standsIB:MY21-Mar  0.01620    0.56821 99.00001   0.029 0.977310    
-    ## standsNB:MY21-Mar -0.73427    0.56821 99.00001  -1.292 0.199273    
-    ## standsIB:MY21-Apr  0.30589    0.56821 99.00001   0.538 0.591552    
-    ## standsNB:MY21-Apr -0.36926    0.56821 99.00001  -0.650 0.517280    
-    ## standsIB:MY21-May  0.93732    0.56821 99.00001   1.650 0.102192    
-    ## standsNB:MY21-May -0.00854    0.56821 99.00001  -0.015 0.988039    
-    ## standsIB:MY21-Jun  1.08350    0.56821 99.00001   1.907 0.059435 .  
-    ## standsNB:MY21-Jun -0.20523    0.56821 99.00001  -0.361 0.718728    
-    ## standsIB:MY21-Jul  1.08808    0.56821 99.00001   1.915 0.058388 .  
-    ## standsNB:MY21-Jul -0.24006    0.56821 99.00001  -0.422 0.673587    
-    ## standsIB:MY21-Aug  0.54220    0.56821 99.00001   0.954 0.342295    
-    ## standsNB:MY21-Aug  0.27952    0.56821 99.00001   0.492 0.623855    
-    ## standsIB:MY21-Sep  0.05255    0.56821 99.00001   0.092 0.926501    
-    ## standsNB:MY21-Sep -0.30119    0.56821 99.00001  -0.530 0.597249    
-    ## standsIB:MY21-Oct  0.58400    0.56821 99.00001   1.028 0.306550    
-    ## standsNB:MY21-Oct  0.16358    0.56821 99.00001   0.288 0.774033    
-    ## standsIB:MY21-Nov  0.54586    0.56821 99.00001   0.961 0.339061    
-    ## standsNB:MY21-Nov -0.28973    0.56821 99.00001  -0.510 0.611257    
+    ##             Estimate Std. Error       df t value Pr(>|t|)    
+    ## (Intercept)  4.96591    0.26183  9.00000  18.966 1.45e-08 ***
+    ## standsIB    -0.09869    0.37028  9.00000  -0.267    0.796    
+    ## standsNB     0.28772    0.37028  9.00000   0.777    0.457    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 36 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.707       
+    ## standsNB -0.707  0.500
 
 ``` r
 anova(m_DL)
 ```
 
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq Mean Sq NumDF DenDF F value Pr(>F)    
-    ## stands      0.394   0.197     2     9  0.6100 0.5643    
-    ## MY        171.330  15.575    11    99 48.2424 <2e-16 ***
-    ## stands:MY   8.205   0.373    22    99  1.1552 0.3057    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
+    ## stands 2.2319  1.1159     2     9  0.5879 0.5755
 
 ``` r
 r2_nakagawa(m_DL)
@@ -799,8 +646,8 @@ r2_nakagawa(m_DL)
 
     ## # R2 for Mixed Models
     ## 
-    ##   Conditional R2: 0.812
-    ##      Marginal R2: 0.740
+    ##   Conditional R2: 0.055
+    ##      Marginal R2: 0.013
 
 ``` r
 # D_FR
@@ -808,81 +655,45 @@ r2_nakagawa(m_DL)
 cbc_mo_bc_DFR <- 
   cbc_mo_bc[[1]] %>% filter(!MY %in% c("20-Sep", "21-Oct", "21-Nov", "21-Dec", "22-Jan"))
 
-m_DFR <- lmerTest::lmer(D_FR ~ stands*MY +(1|new_pl),cbc_mo_bc_DFR)
+m_DFR <- lmerTest::lmer(D_FR ~ stands +(1|new_pl),cbc_mo_bc_DFR)
 ```
-
-    ## fixed-effect model matrix is rank deficient so dropping 1 column / coefficient
 
     ## boundary (singular) fit: see help('isSingular')
 
 ``` r
+#m_DFR <- lmerTest::lmer(D_FR ~ stands*MY +(1|new_pl),cbc_mo_bc_DFR)
 summary(m_DFR)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: D_FR ~ stands * MY + (1 | new_pl)
+    ## Formula: D_FR ~ stands + (1 | new_pl)
     ##    Data: cbc_mo_bc_DFR
     ## 
-    ## REML criterion at convergence: 468.9
+    ## REML criterion at convergence: 580.7
     ## 
     ## Scaled residuals: 
     ##      Min       1Q   Median       3Q      Max 
-    ## -1.95186 -0.50658 -0.02227  0.59691  2.55921 
+    ## -2.60959 -0.53971 -0.02588  0.64366  2.37845 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
     ##  new_pl   (Intercept) 0.000    0.000   
-    ##  Residual             4.596    2.144   
+    ##  Residual             4.835    2.199   
     ## Number of obs: 132, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error      df t value Pr(>|t|)    
-    ## (Intercept)         3.9602     1.0719 97.0000   3.694 0.000365 ***
-    ## standsIB           -0.1091     1.5160 97.0000  -0.072 0.942776    
-    ## standsNB            1.3400     1.5160 97.0000   0.884 0.378932    
-    ## MY20-Nov           -1.8685     1.5160 97.0000  -1.233 0.220715    
-    ## MY20-Dec            0.1752     1.5160 97.0000   0.116 0.908230    
-    ## MY21-Jan            0.3364     1.5160 97.0000   0.222 0.824845    
-    ## MY21-Feb            0.1914     1.5160 97.0000   0.126 0.899787    
-    ## MY21-Mar            0.3622     1.5160 97.0000   0.239 0.811683    
-    ## MY21-Apr           -0.6272     1.5160 97.0000  -0.414 0.679977    
-    ## MY21-May            0.9544     1.5160 97.0000   0.630 0.530469    
-    ## MY21-Jun            0.6573     1.5160 97.0000   0.434 0.665548    
-    ## MY21-Jul           -0.6869     1.5160 97.0000  -0.453 0.651484    
-    ## MY21-Aug            1.0556     1.5160 97.0000   0.696 0.487892    
-    ## MY21-Sep            0.6226     1.5160 97.0000   0.411 0.682202    
-    ## standsIB:MY20-Nov   2.0412     2.1439 97.0000   0.952 0.343424    
-    ## standsNB:MY20-Nov   2.3974     2.1439 97.0000   1.118 0.266225    
-    ## standsIB:MY20-Dec   0.6189     2.1439 97.0000   0.289 0.773442    
-    ## standsNB:MY20-Dec  -0.6225     2.1439 97.0000  -0.290 0.772167    
-    ## standsIB:MY21-Jan  -1.8900     2.1439 97.0000  -0.882 0.380189    
-    ## standsNB:MY21-Jan  -2.8617     2.1439 97.0000  -1.335 0.185056    
-    ## standsIB:MY21-Feb  -2.6026     2.1439 97.0000  -1.214 0.227702    
-    ## standsNB:MY21-Feb  -1.8803     2.1439 97.0000  -0.877 0.382615    
-    ## standsIB:MY21-Mar  -0.5906     2.1439 97.0000  -0.275 0.783529    
-    ## standsNB:MY21-Mar  -4.2343     2.1439 97.0000  -1.975 0.051106 .  
-    ## standsIB:MY21-Apr   1.6222     2.1439 97.0000   0.757 0.451077    
-    ## standsNB:MY21-Apr   0.4760     2.1439 97.0000   0.222 0.824754    
-    ## standsIB:MY21-May  -1.7948     2.2314 97.0000  -0.804 0.423163    
-    ## standsIB:MY21-Jun  -0.2078     2.2314 97.0000  -0.093 0.925995    
-    ## standsNB:MY21-Jun  -1.4234     2.1439 97.0000  -0.664 0.508315    
-    ## standsIB:MY21-Jul   3.7396     2.2314 97.0000   1.676 0.096983 .  
-    ## standsNB:MY21-Jul   2.2792     2.8361 97.0000   0.804 0.423568    
-    ## standsIB:MY21-Aug  -0.2869     2.2314 97.0000  -0.129 0.897968    
-    ## standsNB:MY21-Aug  -2.0768     2.2314 97.0000  -0.931 0.354314    
-    ## standsIB:MY21-Sep  -1.9069     2.1439 97.0000  -0.889 0.375961    
-    ## standsNB:MY21-Sep  -1.0479     2.1439 97.0000  -0.489 0.626104    
+    ##             Estimate Std. Error       df t value Pr(>|t|)    
+    ## (Intercept)   4.0579     0.3174 129.0000  12.785   <2e-16 ***
+    ## standsIB     -0.2925     0.4589 129.0000  -0.637    0.525    
+    ## standsNB      0.2707     0.4708 129.0000   0.575    0.566    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 35 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
-
-    ## fit warnings:
-    ## fixed-effect model matrix is rank deficient so dropping 1 column / coefficient
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.692       
+    ## standsNB -0.674  0.466
     ## optimizer (nloptwrap) convergence code: 0 (OK)
     ## boundary (singular) fit: see help('isSingular')
 
@@ -890,14 +701,9 @@ summary(m_DFR)
 anova(m_DFR)
 ```
 
-    ## Missing cells for: standsNB:MY21-May.  
-    ## Interpret type III hypotheses with care.
-
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
-    ## stands      8.277  4.1384     2    97  0.9004 0.4098
-    ## MY         58.988  5.3625    11    97  1.1667 0.3202
-    ## stands:MY 123.537  5.8827    21    97  1.2799 0.2080
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
+    ## stands 6.6658  3.3329     2   129  0.6893 0.5038
 
 ``` r
 r2_nakagawa(m_DFR)
@@ -914,7 +720,7 @@ r2_nakagawa(m_DFR)
     ## # R2 for Mixed Models
     ## 
     ##   Conditional R2: NA
-    ##      Marginal R2: 0.235
+    ##      Marginal R2: 0.010
 
 ``` r
 # P_FR
@@ -922,80 +728,45 @@ r2_nakagawa(m_DFR)
 
 cbc_mo_PFR <- cbc_mo %>% filter(!MY %in% c("20-Sep", "21-Oct", "21-Nov", "21-Dec", "22-Jan"))
 
-m_PFR <- lmerTest::lmer(P_FR ~ stands*MY +(1|new_pl), cbc_mo_PFR)
+m_PFR <- lmerTest::lmer(P_FR ~ stands +(1|new_pl), cbc_mo_PFR)
 ```
 
-    ## fixed-effect model matrix is rank deficient so dropping 1 column / coefficient
     ## boundary (singular) fit: see help('isSingular')
 
 ``` r
+#m_PFR <- lmerTest::lmer(P_FR ~ stands*MY +(1|new_pl), cbc_mo_PFR)
 summary(m_PFR)
 ```
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: P_FR ~ stands * MY + (1 | new_pl)
+    ## Formula: P_FR ~ stands + (1 | new_pl)
     ##    Data: cbc_mo_PFR
     ## 
-    ## REML criterion at convergence: 958.7
+    ## REML criterion at convergence: 1255
     ## 
     ## Scaled residuals: 
-    ##      Min       1Q   Median       3Q      Max 
-    ## -2.35658 -0.59407  0.04242  0.52670  2.64429 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -2.8585 -0.6517 -0.2379  0.5974  3.1650 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance Std.Dev.
     ##  new_pl   (Intercept)   0.0     0.00   
-    ##  Residual             716.3    26.76   
+    ##  Residual             900.7    30.01   
     ## Number of obs: 132, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error      df t value Pr(>|t|)   
-    ## (Intercept)         35.055     13.382  97.000   2.620  0.01022 * 
-    ## standsIB             2.580     18.925  97.000   0.136  0.89184   
-    ## standsNB            17.450     18.925  97.000   0.922  0.35877   
-    ## MY20-Nov           -26.682     18.925  97.000  -1.410  0.16176   
-    ## MY20-Dec             3.043     18.925  97.000   0.161  0.87261   
-    ## MY21-Jan           -42.805     18.925  97.000  -2.262  0.02594 * 
-    ## MY21-Feb           -13.925     18.925  97.000  -0.736  0.46362   
-    ## MY21-Mar           -11.017     18.925  97.000  -0.582  0.56180   
-    ## MY21-Apr           -27.852     18.925  97.000  -1.472  0.14432   
-    ## MY21-May             6.985     18.925  97.000   0.369  0.71286   
-    ## MY21-Jun           -19.912     18.925  97.000  -1.052  0.29532   
-    ## MY21-Jul           -20.755     18.925  97.000  -1.097  0.27548   
-    ## MY21-Aug           -54.932     18.925  97.000  -2.903  0.00458 **
-    ## MY21-Sep             1.063     18.925  97.000   0.056  0.95534   
-    ## standsIB:MY20-Nov   10.285     26.763  97.000   0.384  0.70160   
-    ## standsNB:MY20-Nov    3.117     26.763  97.000   0.116  0.90751   
-    ## standsIB:MY20-Dec  -30.780     26.763  97.000  -1.150  0.25294   
-    ## standsNB:MY20-Dec  -59.815     26.763  97.000  -2.235  0.02771 * 
-    ## standsIB:MY21-Jan    8.310     26.763  97.000   0.310  0.75685   
-    ## standsNB:MY21-Jan   25.032     26.763  97.000   0.935  0.35194   
-    ## standsIB:MY21-Feb  -17.185     26.763  97.000  -0.642  0.52232   
-    ## standsNB:MY21-Feb  -30.365     26.763  97.000  -1.135  0.25935   
-    ## standsIB:MY21-Mar   -5.508     26.763  97.000  -0.206  0.83739   
-    ## standsNB:MY21-Mar  -16.033     26.763  97.000  -0.599  0.55054   
-    ## standsIB:MY21-Apr   16.115     26.763  97.000   0.602  0.54849   
-    ## standsNB:MY21-Apr   -2.215     26.763  97.000  -0.083  0.93421   
-    ## standsIB:MY21-May  -46.193     27.856  97.000  -1.658  0.10049   
-    ## standsIB:MY21-Jun   40.597     27.856  97.000   1.457  0.14824   
-    ## standsNB:MY21-Jun   25.277     26.763  97.000   0.944  0.34727   
-    ## standsIB:MY21-Jul    4.180     27.856  97.000   0.150  0.88103   
-    ## standsNB:MY21-Jul  -57.320     35.405  97.000  -1.619  0.10869   
-    ## standsIB:MY21-Aug   34.017     27.856  97.000   1.221  0.22498   
-    ## standsNB:MY21-Aug   11.624     27.856  97.000   0.417  0.67739   
-    ## standsIB:MY21-Sep  -19.875     26.763  97.000  -0.743  0.45951   
-    ## standsNB:MY21-Sep  -67.975     26.763  97.000  -2.540  0.01268 * 
+    ##             Estimate Std. Error      df t value Pr(>|t|)    
+    ## (Intercept)   17.822      4.332 129.000   4.114 6.88e-05 ***
+    ## standsIB       1.738      6.264 129.000   0.277    0.782    
+    ## standsNB       3.376      6.425 129.000   0.525    0.600    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
     ## 
-    ## Correlation matrix not shown by default, as p = 35 > 12.
-    ## Use print(x, correlation=TRUE)  or
-    ##     vcov(x)        if you need it
-
-    ## fit warnings:
-    ## fixed-effect model matrix is rank deficient so dropping 1 column / coefficient
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.692       
+    ## standsNB -0.674  0.466
     ## optimizer (nloptwrap) convergence code: 0 (OK)
     ## boundary (singular) fit: see help('isSingular')
 
@@ -1003,16 +774,9 @@ summary(m_PFR)
 anova(m_PFR)
 ```
 
-    ## Missing cells for: standsNB:MY21-May.  
-    ## Interpret type III hypotheses with care.
-
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##           Sum Sq Mean Sq NumDF DenDF F value   Pr(>F)   
-    ## stands       120   60.02     2    97  0.0838 0.919683   
-    ## MY         19488 1771.60    11    97  2.4733 0.008935 **
-    ## stands:MY  27930 1329.99    21    97  1.8568 0.022802 * 
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##        Sum Sq Mean Sq NumDF DenDF F value Pr(>F)
+    ## stands 249.91  124.95     2   129  0.1387 0.8706
 
 ``` r
 r2_nakagawa(m_PFR)
@@ -1029,21 +793,82 @@ r2_nakagawa(m_PFR)
     ## # R2 for Mixed Models
     ## 
     ##   Conditional R2: NA
-    ##      Marginal R2: 0.334
+    ##      Marginal R2: 0.002
+
+``` r
+# FR_mass
+# Oct 20 - Sep 21
+
+cbc_mo_FR <- cbc_mo %>% filter(!MY %in% c("20-Sep", "21-Oct", "21-Nov", "21-Dec", "22-Jan"))
+m_FR <- lmerTest::lmer(FR_mass_gC ~ stands +(1|new_pl), cbc_mo_FR)
+#m_FR <- lmerTest::lmer(FR_mass_gC ~ stands*MY +(1|new_pl), cbc_mo_FR)
+summary(m_FR)
+```
+
+    ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+    ## lmerModLmerTest]
+    ## Formula: FR_mass_gC ~ stands + (1 | new_pl)
+    ##    Data: cbc_mo_FR
+    ## 
+    ## REML criterion at convergence: 1259.7
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.9910 -0.6679 -0.1875  0.6958  3.3355 
+    ## 
+    ## Random effects:
+    ##  Groups   Name        Variance Std.Dev.
+    ##  new_pl   (Intercept) 360.7    18.99   
+    ##  Residual             826.0    28.74   
+    ## Number of obs: 132, groups:  new_pl, 12
+    ## 
+    ## Fixed effects:
+    ##             Estimate Std. Error      df t value Pr(>|t|)    
+    ## (Intercept)  132.898     10.363   8.840  12.824 5.17e-07 ***
+    ## standsIB     -19.405     14.716   8.983  -1.319    0.220    
+    ## standsNB      22.082     14.775   9.131   1.495    0.169    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Correlation of Fixed Effects:
+    ##          (Intr) stndIB
+    ## standsIB -0.704       
+    ## standsNB -0.701  0.494
+
+``` r
+anova(m_FR)
+```
+
+    ## Type III Analysis of Variance Table with Satterthwaite's method
+    ##        Sum Sq Mean Sq NumDF  DenDF F value  Pr(>F)  
+    ## stands 6467.1  3233.6     2 9.1276  3.9146 0.05921 .
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+r2_nakagawa(m_FR)
+```
+
+    ## # R2 for Mixed Models
+    ## 
+    ##   Conditional R2: 0.435
+    ##      Marginal R2: 0.188
 
 ``` r
 # vwc
 # Sep 20 - Aug 21?
 cbc_mo_sqrt_vwc <- 
-  cbc_mo_sqrt %>% 
-  filter(!MY %in% c("21-Sep", "21-Oct", "21-Nov", "21-Dec", "22-Jan"))
+  cbc_mo_raw %>%
+  select(c(stands, plot_num, MY, vwc)) %>%
+  mutate(vwc_sqrt = sqrt(vwc),
+         new_pl = factor(paste0(stands, "P", plot_num)),
+         MY = factor(MY, level = MY_order_v1)) %>%
+  filter(MY %in% c("20-Sep", "20-Oct", "20-Nov", "20-Dec", 
+                 "21-Jan", "21-Feb", "21-Mar", "21-Apr", "21-May", 
+                 "21-Jun", "21-Jul", "21-Aug")) %>%
+  filter(!MY %in% c("21-Aug", "21-May")) # missing values
 
 m_vwc <- lmerTest::lmer(vwc ~ stands*MY +(1|new_pl), cbc_mo_sqrt_vwc)
-```
-
-    ## fixed-effect model matrix is rank deficient so dropping 3 columns / coefficients
-
-``` r
 summary(m_vwc)
 ```
 
@@ -1052,76 +877,67 @@ summary(m_vwc)
     ## Formula: vwc ~ stands * MY + (1 | new_pl)
     ##    Data: cbc_mo_sqrt_vwc
     ## 
-    ## REML criterion at convergence: -217.1
+    ## REML criterion at convergence: -318.6
     ## 
     ## Scaled residuals: 
-    ##     Min      1Q  Median      3Q     Max 
-    ## -2.3535 -0.4379  0.0000  0.5078  2.8129 
+    ##      Min       1Q   Median       3Q      Max 
+    ## -2.30487 -0.43757 -0.04883  0.45281  2.91746 
     ## 
     ## Random effects:
     ##  Groups   Name        Variance  Std.Dev.
-    ##  new_pl   (Intercept) 0.0005493 0.02344 
-    ##  Residual             0.0029598 0.05440 
-    ## Number of obs: 123, groups:  new_pl, 12
+    ##  new_pl   (Intercept) 0.0002091 0.01446 
+    ##  Residual             0.0007556 0.02749 
+    ## Number of obs: 115, groups:  new_pl, 12
     ## 
     ## Fixed effects:
-    ##                   Estimate Std. Error       df t value Pr(>|t|)    
-    ## (Intercept)        0.13676    0.03376 81.36620   4.051 0.000116 ***
-    ## standsIB          -0.06395    0.04491 77.66179  -1.424 0.158499    
-    ## standsNB           0.03841    0.04491 77.66179   0.855 0.395078    
-    ## MY20-Oct           0.02072    0.04174 81.10318   0.496 0.620941    
-    ## MY20-Nov           0.04960    0.04174 81.10318   1.188 0.238217    
-    ## MY20-Dec           0.19257    0.04174 81.10318   4.613 1.46e-05 ***
-    ## MY21-Jan           0.16733    0.04174 81.10318   4.008 0.000135 ***
-    ## MY21-Feb           0.13251    0.04174 81.10318   3.174 0.002123 ** 
-    ## MY21-Mar           0.14401    0.04174 81.10318   3.450 0.000893 ***
-    ## MY21-Apr           0.03571    0.04174 81.10318   0.855 0.394883    
-    ## MY21-May           0.16991    0.04174 81.10318   4.070 0.000108 ***
-    ## MY21-Jun           0.19821    0.04174 81.10318   4.748 8.72e-06 ***
-    ## MY21-Jul           0.19901    0.04174 81.10318   4.767 8.09e-06 ***
-    ## MY21-Aug          -0.01005    0.06377 82.74171  -0.158 0.875190    
-    ## standsIB:MY20-Oct  0.05855    0.05677 80.71535   1.031 0.305447    
-    ## standsNB:MY20-Oct -0.13956    0.05906 81.23679  -2.363 0.020511 *  
-    ## standsIB:MY20-Nov  0.01070    0.05677 80.71535   0.189 0.850954    
-    ## standsNB:MY20-Nov -0.12378    0.05677 80.71535  -2.180 0.032136 *  
-    ## standsIB:MY20-Dec -0.02685    0.05677 80.71535  -0.473 0.637449    
-    ## standsNB:MY20-Dec -0.18304    0.05677 80.71535  -3.224 0.001823 ** 
-    ## standsIB:MY21-Jan  0.06966    0.05677 80.71535   1.227 0.223359    
-    ## standsNB:MY21-Jan -0.07383    0.05677 80.71535  -1.301 0.197116    
-    ## standsIB:MY21-Feb -0.00621    0.05677 80.71535  -0.109 0.913165    
-    ## standsNB:MY21-Feb -0.06523    0.05677 80.71535  -1.149 0.253914    
-    ## standsIB:MY21-Mar  0.03118    0.05677 80.71535   0.549 0.584318    
-    ## standsNB:MY21-Mar -0.06210    0.05677 80.71535  -1.094 0.277243    
-    ## standsIB:MY21-Apr  0.06921    0.05677 80.71535   1.219 0.226339    
-    ## standsNB:MY21-Apr  0.06714    0.07482 83.16524   0.897 0.372115    
-    ## standsIB:MY21-May  0.04324    0.05904 81.10318   0.732 0.466019    
-    ## standsIB:MY21-Jun  0.07255    0.05677 80.71535   1.278 0.204880    
-    ## standsNB:MY21-Jun -0.08982    0.05677 80.71535  -1.582 0.117493    
-    ## standsIB:MY21-Jul  0.02284    0.05677 80.71535   0.402 0.688487    
-    ## standsNB:MY21-Jul -0.15562    0.05677 80.71535  -2.741 0.007532 ** 
+    ##                    Estimate Std. Error        df t value Pr(>|t|)    
+    ## (Intercept)        0.021031   0.017582 70.888144   1.196  0.23562    
+    ## standsIB          -0.012812   0.023458 66.211521  -0.546  0.58679    
+    ## standsNB           0.009819   0.023458 66.211521   0.419  0.67687    
+    ## MY20-Oct           0.006019   0.021112 76.364156   0.285  0.77633    
+    ## MY20-Nov           0.015969   0.021112 76.364156   0.756  0.45174    
+    ## MY20-Dec           0.089669   0.021112 76.364156   4.247 6.04e-05 ***
+    ## MY21-Jan           0.072259   0.021112 76.364156   3.423  0.00100 ***
+    ## MY21-Feb           0.052219   0.021112 76.364156   2.473  0.01560 *  
+    ## MY21-Mar           0.059719   0.021112 76.364156   2.829  0.00597 ** 
+    ## MY21-Apr           0.009869   0.021112 76.364156   0.467  0.64150    
+    ## MY21-Jun           0.091354   0.021112 76.364156   4.327 4.52e-05 ***
+    ## MY21-Jul           0.094469   0.021112 76.364156   4.475 2.63e-05 ***
+    ## standsIB:MY20-Oct  0.011312   0.028697 76.050725   0.394  0.69454    
+    ## standsNB:MY20-Oct -0.036432   0.029865 76.424735  -1.220  0.22625    
+    ## standsIB:MY20-Nov -0.005788   0.028697 76.050725  -0.202  0.84069    
+    ## standsNB:MY20-Nov -0.035419   0.028697 76.050725  -1.234  0.22091    
+    ## standsIB:MY20-Dec -0.040838   0.028697 76.050725  -1.423  0.15880    
+    ## standsNB:MY20-Dec -0.085769   0.028697 76.050725  -2.989  0.00377 ** 
+    ## standsIB:MY21-Jan  0.017122   0.028697 76.050725   0.597  0.55251    
+    ## standsNB:MY21-Jan -0.025059   0.028697 76.050725  -0.873  0.38528    
+    ## standsIB:MY21-Feb -0.017238   0.028697 76.050725  -0.601  0.54983    
+    ## standsNB:MY21-Feb -0.023469   0.028697 76.050725  -0.818  0.41601    
+    ## standsIB:MY21-Mar -0.005438   0.028697 76.050725  -0.189  0.85021    
+    ## standsNB:MY21-Mar -0.019769   0.028697 76.050725  -0.689  0.49298    
+    ## standsIB:MY21-Apr  0.014762   0.028697 76.050725   0.514  0.60846    
+    ## standsNB:MY21-Apr  0.032424   0.037888 77.788505   0.856  0.39475    
+    ## standsIB:MY21-Jun  0.019177   0.028697 76.050725   0.668  0.50598    
+    ## standsNB:MY21-Jun -0.032804   0.028697 76.050725  -1.143  0.25657    
+    ## standsIB:MY21-Jul -0.008938   0.028697 76.050725  -0.311  0.75630    
+    ## standsNB:MY21-Jul -0.063369   0.028697 76.050725  -2.208  0.03024 *  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
     ## 
-    ## Correlation matrix not shown by default, as p = 33 > 12.
+    ## Correlation matrix not shown by default, as p = 30 > 12.
     ## Use print(x, correlation=TRUE)  or
     ##     vcov(x)        if you need it
-
-    ## fit warnings:
-    ## fixed-effect model matrix is rank deficient so dropping 3 columns / coefficients
 
 ``` r
 anova(m_vwc)
 ```
 
-    ## Missing cells for: standsNB:MY21-May, standsIB:MY21-Aug, standsNB:MY21-Aug.  
-    ## Interpret type III hypotheses with care.
-
     ## Type III Analysis of Variance Table with Satterthwaite's method
-    ##            Sum Sq  Mean Sq NumDF  DenDF F value  Pr(>F)    
-    ## stands    0.01396 0.006979     2  8.717  2.3579 0.15188    
-    ## MY        0.57382 0.052166    11 81.021 17.6245 < 2e-16 ***
-    ## stands:MY 0.10850 0.005711    19 80.623  1.9293 0.02255 *  
+    ##             Sum Sq   Mean Sq NumDF  DenDF F value    Pr(>F)    
+    ## stands    0.002038 0.0010188     2  8.972  1.3484    0.3076    
+    ## MY        0.104668 0.0116297     9 76.015 15.3924 6.033e-14 ***
+    ## stands:MY 0.018306 0.0010170    18 75.931  1.3460    0.1849    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1131,18 +947,22 @@ r2_nakagawa(m_vwc)
 
     ## # R2 for Mixed Models
     ## 
-    ##   Conditional R2: 0.694
-    ##      Marginal R2: 0.637
+    ##   Conditional R2: 0.651
+    ##      Marginal R2: 0.554
 
 ``` r
 # Ts
 # Sep 20 - Aug 21?
 cbc_mo_Ts <- 
-  cbc_mo %>% 
-  filter(!MY %in% c("20-Jul","20-Aug","21-Sep", "21-Oct", 
-                   "21-Nov", "21-Dec", "22-Jan"))
+  cbc_mo_raw %>% 
+  mutate(new_pl = factor(paste0(stands, "P", plot_num)),
+         MY = factor(MY, level = MY_order_v1)) %>%
+  filter(MY %in% c("20-Sep", "20-Oct", "20-Nov", "20-Dec", 
+                 "21-Jan", "21-Feb", "21-Mar", "21-Apr", "21-May", 
+                 "21-Jun", "21-Jul", "21-Aug"))
 
 m_Ts <- lmerTest::lmer(Ts ~ stands*MY +(1|new_pl), cbc_mo_Ts)
+#m_Ts <- lmerTest::lmer(Ts ~ stands*MY +(1|new_pl), cbc_mo_Ts)
 summary(m_Ts)
 ```
 
@@ -1277,11 +1097,9 @@ check_LMM_homogeneity(m_SR, cbc_mo_bc_SR, "SR")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df Sum Sq Mean Sq F value  Pr(>F)  
-    ## new_pl     11  55.76  5.0688  1.6696 0.08705 .
-    ## Residuals 132 400.73  3.0358                  
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##            Df Sum Sq Mean Sq F value Pr(>F)
+    ## new_pl     11  46.44  4.2220   0.652 0.7802
+    ## Residuals 108 699.31  6.4751
 
 ``` r
 # looks good
@@ -1300,11 +1118,9 @@ check_LMM_homogeneity(m_Rh, cbc_mo_bc_SR, "Rh")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df  Sum Sq Mean Sq F value   Pr(>F)   
-    ## new_pl     11  7.7355 0.70323  2.9741 0.001475 **
-    ## Residuals 132 31.2113 0.23645                    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##            Df  Sum Sq Mean Sq F value Pr(>F)
+    ## new_pl     11  1063.6  96.688  0.9776 0.4712
+    ## Residuals 108 10681.3  98.901
 
 ``` r
 # homogeneity of variances don't meet = differences in study plots...
@@ -1322,11 +1138,9 @@ check_LMM_homogeneity(m_Ra, cbc_mo_bc_SR, "Ra")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df Sum Sq  Mean Sq F value  Pr(>F)  
-    ## new_pl     11 1.7266 0.156961  2.3202 0.01228 *
-    ## Residuals 132 8.9297 0.067649                  
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##            Df  Sum Sq Mean Sq F value Pr(>F)
+    ## new_pl     11  42.932  3.9029   1.536  0.129
+    ## Residuals 108 274.417  2.5409
 
 ``` r
 # homogeneity of variances don't meet = differences in study plots...
@@ -1346,9 +1160,9 @@ check_LMM_homogeneity(m_DL, cbc_mo_bc_DL, "D_L")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df  Sum Sq Mean Sq F value Pr(>F)
-    ## new_pl     11  1.5796 0.14360  1.0792 0.3828
-    ## Residuals 132 17.5643 0.13306
+    ##            Df Sum Sq Mean Sq F value Pr(>F)
+    ## new_pl     11  38.78  3.5259  0.4782 0.9132
+    ## Residuals 108 796.38  7.3739
 
 ``` r
 # looks good
@@ -1368,8 +1182,8 @@ check_LMM_homogeneity(m_DFR, cbc_mo_bc_DFR, "D_FR")
     ## 
     ## Response: residual_2
     ##            Df Sum Sq Mean Sq F value  Pr(>F)  
-    ## new_pl     11  459.9  41.809  1.9869 0.03534 *
-    ## Residuals 120 2525.0  21.042                  
+    ## new_pl     11  787.8  71.617   1.844 0.05382 .
+    ## Residuals 120 4660.6  38.838                  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1390,9 +1204,9 @@ check_LMM_homogeneity(m_PFR, cbc_mo_PFR, "P_FR")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df   Sum Sq Mean Sq F value Pr(>F)
-    ## new_pl     11  9064244  824022   1.068 0.3928
-    ## Residuals 120 92590059  771584
+    ##            Df    Sum Sq Mean Sq F value Pr(>F)
+    ## new_pl     11  34763345 3160304  1.5571 0.1203
+    ## Residuals 120 243560437 2029670
 
 ``` r
 # looks good
@@ -1411,9 +1225,9 @@ check_LMM_homogeneity(m_vwc, cbc_mo_sqrt_vwc, "vwc")
     ## Analysis of Variance Table
     ## 
     ## Response: residual_2
-    ##            Df     Sum Sq   Mean Sq F value  Pr(>F)  
-    ## new_pl     11 0.00023815 2.165e-05  1.9991 0.03489 *
-    ## Residuals 111 0.00120212 1.083e-05                  
+    ##            Df     Sum Sq    Mean Sq F value  Pr(>F)  
+    ## new_pl     11 2.3609e-05 2.1462e-06  2.2397 0.01752 *
+    ## Residuals 103 9.8705e-05 9.5830e-07                  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1450,7 +1264,7 @@ stand in each month rather than differences in month..
 # emmeans(model, pairwise ~ MY)
 
 # this gives you the stand differences in each month
-lsmeans(m_Ts, pairwise ~ stands | MY, adjust = "tukey")  
+lsmeans(m_Ts, pairwise ~ stands | MY, adjust = "tukey") 
 ```
 
     ## $lsmeans
@@ -1606,81 +1420,95 @@ lsmeans(m_Ts, pairwise ~ stands | MY, adjust = "tukey")
     ## P value adjustment: tukey method for comparing a family of 3 estimates
 
 ``` r
-lsmeans(m_vwc, pairwise ~ stands | MY, adjust = "tukey")  
+lsmeans(m_Ts, pairwise ~ stands, adjust = "tukey")
+```
+
+    ## NOTE: Results may be misleading due to involvement in interactions
+
+    ## $lsmeans
+    ##  stands lsmean    SE    df lower.CL upper.CL
+    ##  AB       20.3 0.269  8.23     19.7     20.9
+    ##  IB       20.9 0.285 10.54     20.3     21.5
+    ##  NB       19.2 0.316 13.16     18.5     19.9
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## Confidence level used: 0.95 
+    ## 
+    ## $contrasts
+    ##  contrast estimate    SE    df t.ratio p.value
+    ##  AB - IB    -0.611 0.392  9.35  -1.559  0.3091
+    ##  AB - NB     1.124 0.415 10.65   2.707  0.0506
+    ##  IB - NB     1.735 0.426 11.86   4.074  0.0042
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## P value adjustment: tukey method for comparing a family of 3 estimates
+
+``` r
+lsmeans(m_vwc, pairwise ~ stands | MY, adjust = "tukey")
 ```
 
     ## $lsmeans
     ## MY = 20-Sep:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.1368 0.0338 82.0   0.0695    0.204
-    ##  IB     0.0728 0.0296 73.6   0.0138    0.132
-    ##  NB     0.1752 0.0296 73.6   0.1161    0.234
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.021031 0.0176 71.3 -0.014078   0.0561
+    ##  IB     0.008219 0.0155 60.8 -0.022836   0.0393
+    ##  NB     0.030850 0.0155 60.8 -0.000205   0.0619
     ## 
     ## MY = 20-Oct:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.1575 0.0296 73.6   0.0985    0.217
-    ##  IB     0.1521 0.0296 73.6   0.0931    0.211
-    ##  NB     0.0563 0.0339 81.7  -0.0111    0.124
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.027050 0.0155 60.8 -0.004005   0.0581
+    ##  IB     0.025550 0.0155 60.8 -0.005505   0.0566
+    ##  NB     0.000438 0.0176 71.2 -0.034705   0.0356
     ## 
     ## MY = 20-Nov:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.1864 0.0296 73.6   0.1273    0.245
-    ##  IB     0.1331 0.0296 73.6   0.0741    0.192
-    ##  NB     0.1010 0.0296 73.6   0.0420    0.160
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.037000 0.0155 60.8  0.005945   0.0681
+    ##  IB     0.018400 0.0155 60.8 -0.012655   0.0495
+    ##  NB     0.011400 0.0155 60.8 -0.019655   0.0425
     ## 
     ## MY = 20-Dec:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.3293 0.0296 73.6   0.2703    0.388
-    ##  IB     0.2385 0.0296 73.6   0.1795    0.298
-    ##  NB     0.1847 0.0296 73.6   0.1257    0.244
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.110700 0.0155 60.8  0.079645   0.1418
+    ##  IB     0.057050 0.0155 60.8  0.025995   0.0881
+    ##  NB     0.034750 0.0155 60.8  0.003695   0.0658
     ## 
     ## MY = 21-Jan:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.3041 0.0296 73.6   0.2451    0.363
-    ##  IB     0.3098 0.0296 73.6   0.2508    0.369
-    ##  NB     0.2687 0.0296 73.6   0.2096    0.328
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.093290 0.0155 60.8  0.062235   0.1243
+    ##  IB     0.097600 0.0155 60.8  0.066545   0.1287
+    ##  NB     0.078050 0.0155 60.8  0.046995   0.1091
     ## 
     ## MY = 21-Feb:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.2693 0.0296 73.6   0.2102    0.328
-    ##  IB     0.1991 0.0296 73.6   0.1401    0.258
-    ##  NB     0.2424 0.0296 73.6   0.1834    0.301
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.073250 0.0155 60.8  0.042195   0.1043
+    ##  IB     0.043200 0.0155 60.8  0.012145   0.0743
+    ##  NB     0.059600 0.0155 60.8  0.028545   0.0907
     ## 
     ## MY = 21-Mar:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.2808 0.0296 73.6   0.2217    0.340
-    ##  IB     0.2480 0.0296 73.6   0.1890    0.307
-    ##  NB     0.2571 0.0296 73.6   0.1981    0.316
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.080750 0.0155 60.8  0.049695   0.1118
+    ##  IB     0.062500 0.0155 60.8  0.031445   0.0936
+    ##  NB     0.070800 0.0155 60.8  0.039745   0.1019
     ## 
     ## MY = 21-Apr:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.1725 0.0296 73.6   0.1134    0.231
-    ##  IB     0.1777 0.0296 73.6   0.1187    0.237
-    ##  NB     0.2780 0.0574 90.0   0.1640    0.392
-    ## 
-    ## MY = 21-May:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.3067 0.0296 73.6   0.2477    0.366
-    ##  IB     0.2860 0.0338 82.0   0.2187    0.353
-    ##  NB     nonEst     NA   NA       NA       NA
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.030900 0.0155 60.8 -0.000155   0.0620
+    ##  IB     0.032850 0.0155 60.8  0.001795   0.0639
+    ##  NB     0.073143 0.0294 85.0  0.014766   0.1315
     ## 
     ## MY = 21-Jun:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.3350 0.0296 73.6   0.2760    0.394
-    ##  IB     0.3436 0.0296 73.6   0.2846    0.403
-    ##  NB     0.2836 0.0296 73.6   0.2245    0.343
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.112385 0.0155 60.8  0.081330   0.1434
+    ##  IB     0.118750 0.0155 60.8  0.087695   0.1498
+    ##  NB     0.089400 0.0155 60.8  0.058345   0.1205
     ## 
     ## MY = 21-Jul:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.3358 0.0296 73.6   0.2768    0.395
-    ##  IB     0.2947 0.0296 73.6   0.2356    0.354
-    ##  NB     0.2186 0.0296 73.6   0.1595    0.278
-    ## 
-    ## MY = 21-Aug:
-    ##  stands lsmean     SE   df lower.CL upper.CL
-    ##  AB     0.1267 0.0572 89.8   0.0131    0.240
-    ##  IB     nonEst     NA   NA       NA       NA
-    ##  NB     nonEst     NA   NA       NA       NA
+    ##  stands   lsmean     SE   df  lower.CL upper.CL
+    ##  AB     0.115500 0.0155 60.8  0.084445   0.1466
+    ##  IB     0.093750 0.0155 60.8  0.062695   0.1248
+    ##  NB     0.061950 0.0155 60.8  0.030895   0.0930
     ## 
     ## Degrees-of-freedom method: kenward-roger 
     ## Confidence level used: 0.95 
@@ -1688,75 +1516,272 @@ lsmeans(m_vwc, pairwise ~ stands | MY, adjust = "tukey")
     ## $contrasts
     ## MY = 20-Sep:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.06395 0.0450 78.6   1.422  0.3344
-    ##  AB - NB  -0.03841 0.0450 78.6  -0.854  0.6705
-    ##  IB - NB  -0.10236 0.0419 73.6  -2.444  0.0442
+    ##  AB - IB   0.01281 0.0235 66.8   0.546  0.8490
+    ##  AB - NB  -0.00982 0.0235 66.8  -0.418  0.9082
+    ##  IB - NB  -0.02263 0.0220 60.8  -1.030  0.5607
     ## 
     ## MY = 20-Oct:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.00540 0.0419 73.6   0.129  0.9909
-    ##  AB - NB   0.10115 0.0450 78.4   2.248  0.0695
-    ##  IB - NB   0.09575 0.0450 78.4   2.128  0.0908
+    ##  AB - IB   0.00150 0.0220 60.8   0.068  0.9974
+    ##  AB - NB   0.02661 0.0235 66.7   1.133  0.4974
+    ##  IB - NB   0.02511 0.0235 66.7   1.069  0.5365
     ## 
     ## MY = 20-Nov:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.05325 0.0419 73.6   1.271  0.4158
-    ##  AB - NB   0.08537 0.0419 73.6   2.038  0.1103
-    ##  IB - NB   0.03212 0.0419 73.6   0.767  0.7244
+    ##  AB - IB   0.01860 0.0220 60.8   0.847  0.6755
+    ##  AB - NB   0.02560 0.0220 60.8   1.166  0.4781
+    ##  IB - NB   0.00700 0.0220 60.8   0.319  0.9456
     ## 
     ## MY = 20-Dec:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.09080 0.0419 73.6   2.168  0.0836
-    ##  AB - NB   0.14463 0.0419 73.6   3.453  0.0026
-    ##  IB - NB   0.05383 0.0419 73.6   1.285  0.4081
+    ##  AB - IB   0.05365 0.0220 60.8   2.443  0.0454
+    ##  AB - NB   0.07595 0.0220 60.8   3.458  0.0028
+    ##  IB - NB   0.02230 0.0220 60.8   1.015  0.5701
     ## 
     ## MY = 21-Jan:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB  -0.00571 0.0419 73.6  -0.136  0.9898
-    ##  AB - NB   0.03542 0.0419 73.6   0.846  0.6760
-    ##  IB - NB   0.04113 0.0419 73.6   0.982  0.5906
+    ##  AB - IB  -0.00431 0.0220 60.8  -0.196  0.9790
+    ##  AB - NB   0.01524 0.0220 60.8   0.694  0.7679
+    ##  IB - NB   0.01955 0.0220 60.8   0.890  0.6485
     ## 
     ## MY = 21-Feb:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.07016 0.0419 73.6   1.675  0.2216
-    ##  AB - NB   0.02682 0.0419 73.6   0.640  0.7984
-    ##  IB - NB  -0.04334 0.0419 73.6  -1.035  0.5575
+    ##  AB - IB   0.03005 0.0220 60.8   1.368  0.3638
+    ##  AB - NB   0.01365 0.0220 60.8   0.622  0.8089
+    ##  IB - NB  -0.01640 0.0220 60.8  -0.747  0.7367
     ## 
     ## MY = 21-Mar:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.03277 0.0419 73.6   0.782  0.7150
-    ##  AB - NB   0.02369 0.0419 73.6   0.566  0.8388
-    ##  IB - NB  -0.00908 0.0419 73.6  -0.217  0.9744
+    ##  AB - IB   0.01825 0.0220 60.8   0.831  0.6854
+    ##  AB - NB   0.00995 0.0220 60.8   0.453  0.8932
+    ##  IB - NB  -0.00830 0.0220 60.8  -0.378  0.9244
     ## 
     ## MY = 21-Apr:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB  -0.00526 0.0419 73.6  -0.126  0.9914
-    ##  AB - NB  -0.10555 0.0646 89.4  -1.634  0.2368
-    ##  IB - NB  -0.10029 0.0646 89.4  -1.553  0.2716
-    ## 
-    ## MY = 21-May:
-    ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.02071 0.0450 78.6   0.461  0.6463
-    ##  AB - NB    nonEst     NA   NA      NA      NA
-    ##  IB - NB    nonEst     NA   NA      NA      NA
+    ##  AB - IB  -0.00195 0.0220 60.8  -0.089  0.9957
+    ##  AB - NB  -0.04224 0.0332 83.4  -1.272  0.4150
+    ##  IB - NB  -0.04029 0.0332 83.4  -1.213  0.4488
     ## 
     ## MY = 21-Jun:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB  -0.00860 0.0419 73.6  -0.205  0.9770
-    ##  AB - NB   0.05141 0.0419 73.6   1.227  0.4410
-    ##  IB - NB   0.06002 0.0419 73.6   1.433  0.3295
+    ##  AB - IB  -0.00637 0.0220 60.8  -0.290  0.9548
+    ##  AB - NB   0.02298 0.0220 60.8   1.047  0.5507
+    ##  IB - NB   0.02935 0.0220 60.8   1.336  0.3808
     ## 
     ## MY = 21-Jul:
     ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB   0.04111 0.0419 73.6   0.981  0.5909
-    ##  AB - NB   0.11721 0.0419 73.6   2.798  0.0178
-    ##  IB - NB   0.07610 0.0419 73.6   1.817  0.1712
-    ## 
-    ## MY = 21-Aug:
-    ##  contrast estimate     SE   df t.ratio p.value
-    ##  AB - IB    nonEst     NA   NA      NA      NA
-    ##  AB - NB    nonEst     NA   NA      NA      NA
-    ##  IB - NB    nonEst     NA   NA      NA      NA
+    ##  AB - IB   0.02175 0.0220 60.8   0.990  0.5857
+    ##  AB - NB   0.05355 0.0220 60.8   2.438  0.0459
+    ##  IB - NB   0.03180 0.0220 60.8   1.448  0.3231
     ## 
     ## Degrees-of-freedom method: kenward-roger 
-    ## P value adjustment: tukey method for varying family sizes
+    ## P value adjustment: tukey method for comparing a family of 3 estimates
+
+``` r
+lsmeans(m_vwc, pairwise ~ stands, adjust = "tukey")
+```
+
+    ## NOTE: Results may be misleading due to involvement in interactions
+
+    ## $lsmeans
+    ##  stands lsmean      SE    df lower.CL upper.CL
+    ##  AB     0.0702 0.00848  8.87   0.0510   0.0894
+    ##  IB     0.0558 0.00844  8.71   0.0366   0.0750
+    ##  NB     0.0510 0.00884 10.40   0.0314   0.0706
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## Confidence level used: 0.95 
+    ## 
+    ## $contrasts
+    ##  contrast estimate     SE   df t.ratio p.value
+    ##  AB - IB   0.01440 0.0120 8.79   1.204  0.4808
+    ##  AB - NB   0.01915 0.0122 9.63   1.563  0.3064
+    ##  IB - NB   0.00475 0.0122 9.54   0.389  0.9208
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## P value adjustment: tukey method for comparing a family of 3 estimates
+
+``` r
+lsmeans(m_SR, pairwise ~ stands | MY, adjust = "tukey")
+```
+
+    ## $lsmeans
+    ## MY = 20-Oct:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      14.67 0.528 36.9    13.60    15.74
+    ##  IB      14.18 0.528 36.9    13.11    15.25
+    ##  NB      15.73 0.528 36.9    14.66    16.80
+    ## 
+    ## MY = 20-Nov:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      12.10 0.528 36.9    11.03    13.17
+    ##  IB      11.61 0.528 36.9    10.54    12.68
+    ##  NB      13.15 0.528 36.9    12.08    14.22
+    ## 
+    ## MY = 20-Dec:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB       9.94 0.528 36.9     8.87    11.01
+    ##  IB       9.45 0.528 36.9     8.38    10.52
+    ##  NB      11.00 0.528 36.9     9.93    12.07
+    ## 
+    ## MY = 21-Jan:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB       7.86 0.528 36.9     6.79     8.93
+    ##  IB       7.37 0.528 36.9     6.30     8.44
+    ##  NB       8.92 0.528 36.9     7.85     9.99
+    ## 
+    ## MY = 21-Feb:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB       8.29 0.528 36.9     7.22     9.36
+    ##  IB       7.80 0.528 36.9     6.73     8.87
+    ##  NB       9.34 0.528 36.9     8.27    10.41
+    ## 
+    ## MY = 21-Mar:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      10.72 0.528 36.9     9.64    11.79
+    ##  IB      10.23 0.528 36.9     9.16    11.30
+    ##  NB      11.77 0.528 36.9    10.70    12.84
+    ## 
+    ## MY = 21-Apr:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      12.19 0.528 36.9    11.12    13.26
+    ##  IB      11.70 0.528 36.9    10.63    12.77
+    ##  NB      13.24 0.528 36.9    12.17    14.31
+    ## 
+    ## MY = 21-May:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      13.15 0.528 36.9    12.08    14.22
+    ##  IB      12.66 0.528 36.9    11.59    13.73
+    ##  NB      14.21 0.528 36.9    13.14    15.28
+    ## 
+    ## MY = 21-Jun:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      14.90 0.528 36.9    13.83    15.97
+    ##  IB      14.41 0.528 36.9    13.34    15.48
+    ##  NB      15.95 0.528 36.9    14.88    17.02
+    ## 
+    ## MY = 21-Jul:
+    ##  stands lsmean    SE   df lower.CL upper.CL
+    ##  AB      15.44 0.528 36.9    14.37    16.51
+    ##  IB      14.95 0.528 36.9    13.88    16.02
+    ##  NB      16.49 0.528 36.9    15.42    17.56
+    ## 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## Confidence level used: 0.95 
+    ## 
+    ## $contrasts
+    ## MY = 20-Oct:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 20-Nov:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 20-Dec:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Jan:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Feb:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Mar:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Apr:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-May:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Jun:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## MY = 21-Jul:
+    ##  contrast estimate    SE df t.ratio p.value
+    ##  AB - IB     0.489 0.511  9   0.958  0.6199
+    ##  AB - NB    -1.054 0.511  9  -2.064  0.1527
+    ##  IB - NB    -1.543 0.511  9  -3.022  0.0349
+    ## 
+    ## Degrees-of-freedom method: kenward-roger 
+    ## P value adjustment: tukey method for comparing a family of 3 estimates
+
+``` r
+lsmeans(m_Rh, pairwise ~ stands | MY, adjust = "tukey")
+```
+
+    ## Error in emmfcn(...): No variable named MY in the reference grid
+
+``` r
+lsmeans(m_Ra, pairwise ~ stands | MY, adjust = "tukey")
+```
+
+    ## Error in emmfcn(...): No variable named MY in the reference grid
+
+``` r
+# contrast
+# ref: https://aosmith.rbind.io/2019/04/15/custom-contrasts-emmeans/
+emm1 = emmeans(m_Ts, specs = pairwise ~ stands)
+```
+
+    ## NOTE: Results may be misleading due to involvement in interactions
+
+``` r
+emm2 = emmeans(m_vwc, specs = pairwise ~ stands)
+```
+
+    ## NOTE: Results may be misleading due to involvement in interactions
+
+``` r
+burn = c(1,1,0)
+unburn = c(0,0,1)
+
+burn_overall = burn/2
+
+contrast(emm1, method = list("burn - unburn" = burn_overall - unburn), adjust = "tukey")
+```
+
+    ##  contrast      estimate    SE   df t.ratio p.value
+    ##  burn - unburn     1.43 0.372 11.9   3.841  0.0024
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger
+
+``` r
+contrast(emm2, method = list("burn - unburn" = burn_overall - unburn), adjust = "tukey")
+```
+
+    ##  contrast      estimate     SE   df t.ratio p.value
+    ##  burn - unburn   0.0119 0.0107 9.85   1.119  0.2896
+    ## 
+    ## Results are averaged over the levels of: MY 
+    ## Degrees-of-freedom method: kenward-roger
