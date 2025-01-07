@@ -1,0 +1,411 @@
+---
+title: "CBC SR component Q10"
+author: "MOEKA"
+date: "2024-06-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("dplyr")
+library("ggplot2")
+library("forestmangr")
+library("tidyr")
+```
+
+```{r}
+sr_temp <- read.csv("G:/Shared drives/Project_CooksBranch/Data/SR/Processed data/sr_temp.csv")
+sr_temp$col_num <- as.character(sr_temp$col_num)
+sr_temp$plot_num <- as.character(sr_temp$plot_num)
+```
+
+
+```{r independent Tref at stand level}
+# AB
+q10_table_CBC_AB <- 
+  sr_temp %>%
+  filter(stands == "AB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands", 
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_CBC_AB %>% 
+  select(c(Flux_adj, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Flux_adj - est)^2)))
+  
+
+# IB
+q10_table_CBC_IB <- 
+  sr_temp %>%
+  filter(stands == "IB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_CBC_IB %>% 
+  select(c(Flux_adj, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Flux_adj - est)^2)))
+
+
+# NB
+q10_table_CBC_NB <- 
+  sr_temp %>%
+  filter(stands == "NB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4,Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_CBC_NB %>% 
+  select(c(Flux_adj, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Flux_adj - est)^2)))
+
+
+# combine all
+q10_table_CBC_ind <-
+  rbind(q10_table_CBC_AB, q10_table_CBC_IB) %>% 
+  rbind(q10_table_CBC_NB)
+
+# plot
+ggplot(q10_table_CBC_ind) + 
+  geom_point(
+    aes(x = Ts, y = Flux_adj, col = stands),
+    size = 2, 
+    alpha = .5
+    ) + 
+  geom_line(
+    aes(Ts, est, col = stands),
+    size = 1.5, 
+    alpha = .8
+    ) +
+  xlab("Soil temperature (\u00b0C)") + 
+  ylab(expression("SR ("~mu~"mol m"^2~"s"^-1~")")) +
+  theme_bw() +
+  theme(
+    axis.title.x = element_text(size = 30),
+    axis.text.x = element_text(size = 30),
+    axis.title.y = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
+    legend.title = element_text(size = 20),
+    legend.text = element_text(size = 20)
+    )+
+  scale_colour_manual("Stand", values = c("#F8766D", "#00BA38", "#619CFF"))
+
+# Summary of the results
+q10_result_CBC_AB <- 
+  sr_temp %>%
+  filter(stands == "AB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_result_CBC_IB <- 
+  sr_temp %>%
+  filter(stands == "IB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_result_CBC_NB <- 
+  sr_temp %>%
+  filter(stands == "NB") %>%
+  nls_table(
+    Flux_adj ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4,Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+# combine all
+q10_result_CBC_ind <-
+  rbind(q10_result_CBC_AB, q10_result_CBC_IB) %>% 
+  rbind(q10_result_CBC_NB)
+
+
+knitr::kable(q10_result_CBC_ind, format = "simple")
+
+
+```
+
+```{r Extract Rh and Ra during stablized}
+
+# Rh and Ra 
+stabled <- 
+    sr_yr %>%
+    filter(MY %in% c("Jan21", "Feb21", "Mar21", "Jul21", "Aug21", "Sep21")) %>% 
+    mutate(col_pair = ceiling(as.numeric(col_num / 2))) %>%
+    select(c(stands, plot_num, col_pair, collar, MY, Flux_adj)) %>%
+    pivot_wider(names_from = collar, values_from = Flux_adj) %>% 
+    rename(SR = shallow, Rh = deep) %>%
+    mutate(Ra = SR - Rh)
+
+# combine with temp data
+stabled_temp_cbc <-  
+    temp %>%
+    mutate(col_pair = ceiling(as.numeric(col_num/2))) %>%
+    select(stands, plot_num, col_pair, MY, Ts) %>%
+    right_join(stabled, by = c("stands", "plot_num", "col_pair", "MY"))
+
+```
+
+
+```{r Rh ind}
+# Rh
+q10_table_stb_Rh_AB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "AB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Rh_AB %>% 
+  select(c(Rh, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Rh - est)^2)))
+
+q10_table_stb_Rh_IB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "IB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Rh_IB %>% 
+  select(c(Rh, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Rh - est)^2)))
+
+
+q10_table_stb_Rh_NB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "NB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Rh_NB %>% 
+  select(c(Rh, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Rh - est)^2)))
+
+# combine all
+q10_table_stb_Rh_ind <-
+  rbind(q10_table_stb_Rh_AB, q10_table_stb_Rh_IB) %>% 
+  rbind(q10_table_stb_Rh_NB)
+
+
+# Summary of the results
+q10_Rh_result_CBC_AB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "AB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_Rh_result_CBC_IB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "IB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_Rh_result_CBC_NB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "NB") %>%
+  nls_table(
+    Rh ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4,Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+```
+
+```{Ra ind}
+# Ra
+q10_table_stb_Ra_AB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "AB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Ra_AB %>% 
+  select(c(Ra, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Ra - est)^2)))
+
+q10_table_stb_Ra_IB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "IB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4,Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Ra_IB %>% 
+  select(c(Ra, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Ra - est)^2)))
+
+q10_table_stb_Ra_NB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "NB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands",
+    output = "merge_est"
+    ) %>%
+  as.data.frame()
+
+# RMSE
+q10_table_stb_Ra_NB %>% 
+  select(c(Ra, est)) %>%
+  na.omit() %>%
+  summarise(rmse = sqrt(mean((Ra - est)^2)))
+
+# combine all
+q10_table_stb_Ra_ind <-
+  rbind(q10_table_stb_Ra_AB, q10_table_stb_Ra_IB) %>% 
+  rbind(q10_table_stb_Ra_NB)
+
+
+# Summary of the results
+q10_Ra_result_CBC_AB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "AB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 20.28) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_Ra_result_CBC_IB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "IB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 21.4) / (10)),
+    mod_start = c(R20 = 4, Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+q10_Ra_result_CBC_NB <- 
+  stabled_temp_cbc %>% 
+  filter(stands == "NB") %>%
+  nls_table(
+    Ra ~ R20 * Q10 ^ ((Ts - 19.33) / (10)),
+    mod_start = c(R20 = 4,Q10 = 2),
+    .groups = "stands"
+    ) %>%
+  as.data.frame()
+
+```
+
+```{r plot level}
+q10_plot_fn_ind <- 
+  function(input_df, model, stand){
+    
+    # Summary of the results
+    df1 <- input_df %>%
+        filter(stands == stand) %>%
+        nls_table(
+          model,
+          mod_start = c(R20 = 4, Q10 = 2),
+          .groups = "plot_num"
+          ) %>% 
+        as.data.frame() %>%
+        arrange(plot_num) %>%
+        add_column(stands = stand)
+        
+    return(df1)
+}
+
+# SR
+cbc_stabled_SR_AB <- 
+  q10_plot_fn_ind(sr_temp, Flux_adj ~ R20 * Q10 ^ ((Ts - 20.28) / 10), "AB")
+
+cbc_stabled_SR_IB <- 
+  q10_plot_fn_ind(sr_temp, Flux_adj ~ R20 * Q10 ^ ((Ts - 21.4) / 10), "IB")
+
+cbc_stabled_SR_NB <- 
+  q10_plot_fn_ind(sr_temp, Flux_adj ~ R20*Q10^((Ts-19.33)/10), "NB")
+
+# Rh
+cbc_stabled_Rh_AB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Rh ~ R20 * Q10 ^ ((Ts - 20.28) / 10), "AB")
+
+cbc_stabled_Rh_IB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Rh ~ R20 * Q10 ^ ((Ts - 21.4) / 10), "IB")
+
+cbc_stabled_Rh_NB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Rh ~ R20 * Q10 ^ ((Ts - 19.33) / 10), "NB")
+
+# Ra
+cbc_stabled_Ra_AB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Ra ~ R20 * Q10 ^ ((Ts - 20.28) / 10), "AB")
+
+cbc_stabled_Ra_IB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Ra ~ R20 * Q10 ^ ((Ts - 21.4) / 10), "IB")
+
+cbc_stabled_Ra_NB <- 
+  q10_plot_fn_ind(stabled_temp_cbc, Ra ~ R20 * Q10 ^ ((Ts - 19.33) / 10), "NB")
+
+
+```
