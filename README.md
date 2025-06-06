@@ -1,4 +1,6 @@
 # Soil Carbon Balance in Cook's Branch Conservancy, TX
 This repository includes the codes associated with a manuscript "The Effect of the Frequency of Prescribed Burning on Annual Soil Carbon Balance in a Loblolly-Shortleaf Pine Forest in East Texas".
 
-The annual data on soil respiration and its component flux, as well as biotic and abiotic variables from this site, are available in the global soil respiration database (SRDB) record number 13224-13226.
+Citation: Ono M, Noormets A, and Mitchell S (2025) The effect of the frequency of prescribed burning on annual soil carbon balance in a loblolly-shortleaf pine forest in East Texas. Front. For. Glob. Change. 8:1602557. doi: 10.3389/ffgc.2025.1602557
+
+The annual data on soil respiration and its component flux, as well as biotic and abiotic variables from this site, are available in the global soil respiration database (SRDB) record numbers 13224-13226.
