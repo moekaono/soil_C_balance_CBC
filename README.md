@@ -5,4 +5,4 @@ This repository includes the codes associated with a manuscript "The Effect of t
 
 **Dataset**: Ono, M., Noormets, A. (2025). Data from: The Effect of the Frequency of Prescribed Burning on Annual Soil Carbon Balance in a Loblolly-Shortleaf Pine Forest in East Texas. Ag Data Commons. https://doi.org/10.15482/USDA.ADC/28235093
 
-The annual data on soil respiration and its component flux, as well as biotic and abiotic variables from this site, are available in the global soil respiration database (SRDB) record numbers 13224-13226.
+The annual data on soil respiration and its component flux, as well as biotic and abiotic variables from this site, are available in the global soil respiration database (SRDB) [https://github.com/bpbond/srdb] record numbers 13224-13226.
